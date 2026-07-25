@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>253 Herron Mews Main Floor Expense Tracker</title>
+    <title>253 Herron Mews Main Floor Household Expense Tracker</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -90,8 +90,12 @@
             border-bottom: 1px solid #ddd;
         }
         th { background-color: #f8f9fa; }
-        .owes { color: #c0392b; font-weight: bold; }
-        .gets-back { color: #27ae60; font-weight: bold; }
+
+        /* --- STATUS COLUMN STYLING --- */
+        .owes { color: #c0392b; font-weight: bold; }        /* Bold Red */
+        .gets-back { color: #27ae60; font-weight: bold; }   /* Bold Green */
+        .settled-up { color: #7f8c8d; font-weight: bold; }   /* Muted Grey */
+
         .payment-list { list-style: none; padding: 0; }
         .payment-list li {
             background: #eef7fe;
@@ -121,30 +125,30 @@
             margin-top: 5px;
         }
 
-        /* --- NEW STYLES FOR HIGHLIGHTED VALUES --- */
+        /* --- STYLES FOR HIGHLIGHTED TABLE VALUES --- */
         .val-household {
             font-weight: bold;
-            color: #2e7d32; /* Bold Green */
+            color: #2e7d32;
         }
         .val-utility {
             font-weight: bold;
-            color: #1976d2; /* Bold Blue */
+            color: #1976d2;
         }
         .val-paid {
             font-weight: bold;
-            color: #6a1b9a; /* Bold Purple */
+            color: #6a1b9a;
         }
         .val-target {
             font-weight: bold;
-            color: #e65100; /* Bold Orange */
+            color: #e65100;
         }
         .val-net-positive {
             font-weight: bold;
-            color: #00838f; /* Bold Teal */
+            color: #27ae60; /* Bold Green */
         }
         .val-net-negative {
             font-weight: bold;
-            color: #d81b60; /* Bold Pinkish Red */
+            color: #c0392b; /* Bold Red */
         }
     </style>
 </head>
@@ -159,7 +163,7 @@
             <div id="role-badge"></div>
         </div>
 
-        <h1>253 Herron Mews Main Floor Expense Tracker</h1>
+        <h1>253 Herron Mews Main Floor Household Expense Tracker</h1>
 
         <!-- Add Expense Form -->
         <div class="card">
@@ -169,9 +173,9 @@
                 <select id="category" required>
                     <option value="household" selected>Upstairs General Household (5-Way Split)</option>
                     <!-- Admin Only Utility Options -->
-                    <option value="shaw" class="admin-option">Shaw Internet (9-Way Split)</option>
-                    <option value="enmax" class="admin-option">Enmax Electricity (9-Way Split)</option>
-                    <option value="atco" class="admin-option">Atco Gas (9-Way Split)</option>
+                    <option value="shaw" class="admin-option">Shaw Internet (5-Way Split)</option>
+                    <option value="enmax" class="admin-option">Enmax Electricity (5-Way Split)</option>
+                    <option value="atco" class="admin-option">Atco Gas (5-Way Split)</option>
                 </select>
                 <input type="text" id="description" placeholder="Description (e.g. Groceries, Utility Bill)" required>
                 <input type="number" id="amount" placeholder="Amount ($)" step="0.01" min="0" required>
@@ -215,8 +219,7 @@
                 <p>⚡ <strong>Enmax Electricity Total:</strong> $<span id="enmax-total">0.00</span> <em>($<span id="enmax-share">0.00</span> / person)</em></p>
                 <p>🔥 <strong>Atco Gas Total:</strong> $<span id="atco-total">0.00</span> <em>($<span id="atco-share">0.00</span> / person)</em></p>
                 <hr style="border:0; border-top: 1px dashed #ccc; margin: 10px 0;">
-                <p><strong>Combined Utility Total (9-Way):</strong> $<span id="utility-total">0.00</span> <em>($<span id="utility-share">0.00</span> / person)</em></p>
-                <p><strong>Main Floor Family Contribution (4/9th Utility Total):</strong> $<span id="mainfloor-total">0.00</span></p>
+                <p><strong>Combined Utility Total (5-Way):</strong> $<span id="utility-total">0.00</span> <em>($<span id="utility-share">0.00</span> / person)</em></p>
             </div>
 
             <h3>1. Spending Breakdown by Person</h3>
@@ -269,9 +272,9 @@
         const JSONBIN_BIN_ID = "CREATE_A_NEW_BIN_FOR_UPSTAIRS_OR_REUSE_EXISTING"; 
         const JSONBIN_MASTER_KEY = "$2a$10$aGsMHmzawGqngUYQk4byNO6eOgVEFFObkr5LyuKv1hQ73QECFOWN2";
 
-        // Upstairs household group (5 Members)
+        // Main floor household group (5 Members)
         const upstairsHousehold = ["Jigneshkumar", "Jaimin", "Ishanibhabhi", "Viru", "Drashti"]; 
-        const TOTAL_UTILITY_RESIDENTS = 9; 
+        const TOTAL_UTILITY_RESIDENTS = 5; 
 
         let expenses = [];
 
@@ -407,9 +410,9 @@
                 }
 
                 let categoryTag = '<span style="color:#2980b9;">Household (5-Way)</span>';
-                if (item.category === 'shaw') categoryTag = '<span style="color:#d35400; font-weight:bold;">Shaw Internet (9-Way)</span>';
-                if (item.category === 'enmax') categoryTag = '<span style="color:#f39c12; font-weight:bold;">Enmax Elec (9-Way)</span>';
-                if (item.category === 'atco') categoryTag = '<span style="color:#e74c3c; font-weight:bold;">Atco Gas (9-Way)</span>';
+                if (item.category === 'shaw') categoryTag = '<span style="color:#d35400; font-weight:bold;">Shaw Internet (5-Way)</span>';
+                if (item.category === 'enmax') categoryTag = '<span style="color:#f39c12; font-weight:bold;">Enmax Elec (5-Way)</span>';
+                if (item.category === 'atco') categoryTag = '<span style="color:#e74c3c; font-weight:bold;">Atco Gas (5-Way)</span>';
 
                 row.innerHTML = `
                     <td>${item.date}</td>
@@ -504,8 +507,6 @@
             const utilitySharePerPerson = shawSharePerPerson + enmaxSharePerPerson + atcoSharePerPerson;
             const targetSharePerPerson = householdSharePerPerson + utilitySharePerPerson;
 
-            const mainFloorTotalContribution = utilitySharePerPerson * 4; // Main floor has 4 residents
-
             // Update UI Summary Box
             document.getElementById('household-total').innerText = householdTotal.toFixed(2);
             document.getElementById('household-share').innerText = householdSharePerPerson.toFixed(2);
@@ -521,7 +522,6 @@
 
             document.getElementById('utility-total').innerText = utilityTotal.toFixed(2);
             document.getElementById('utility-share').innerText = utilitySharePerPerson.toFixed(2);
-            document.getElementById('mainfloor-total').innerText = mainFloorTotalContribution.toFixed(2);
 
             // Populate Spending Breakdown Table
             const spendingBody = document.getElementById('spending-breakdown-list');
@@ -549,14 +549,29 @@
             upstairsHousehold.forEach(person => {
                 const paid = (personHouseholdSpent[person] || 0) + (personUtilitySpent[person] || 0);
                 const net = paid - targetSharePerPerson;
-                const statusClass = net >= 0 ? 'gets-back' : 'owes';
-                const netClass = net >= 0 ? 'val-net-positive' : 'val-net-negative';
-                const statusText = net >= 0 
-                    ? `Gets back $${net.toFixed(2)}` 
-                    : `Owes $${Math.abs(net).toFixed(2)}`;
+                
+                const isPositive = net > 0.0001;
+                const isNegative = net < -0.0001;
 
-                if (net < -0.01) debtors.push({ person, amount: Math.abs(net) });
-                if (net > 0.01) creditors.push({ person, amount: net });
+                // Net Balance Cell Styling
+                let netClass = '';
+                if (isPositive) netClass = 'val-net-positive';
+                else if (isNegative) netClass = 'val-net-negative';
+
+                // Status Cell Text & Color Styling
+                let statusClass = 'settled-up';
+                let statusText = 'Gets back $0.00';
+
+                if (isPositive) {
+                    statusClass = 'gets-back';
+                    statusText = `Gets back $${net.toFixed(2)}`;
+                } else if (isNegative) {
+                    statusClass = 'owes';
+                    statusText = `Owes $${Math.abs(net).toFixed(2)}`;
+                }
+
+                if (isNegative) debtors.push({ person, amount: Math.abs(net) });
+                if (isPositive) creditors.push({ person, amount: net });
 
                 const row = document.createElement('tr');
                 row.innerHTML = `
