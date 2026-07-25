@@ -94,7 +94,6 @@
         /* --- STATUS COLUMN STYLING --- */
         .owes { color: #c0392b; font-weight: bold; }        /* Bold Red */
         .gets-back { color: #27ae60; font-weight: bold; }   /* Bold Green */
-        .settled-up { color: #7f8c8d; font-weight: bold; }   /* Muted Grey */
 
         .payment-list { list-style: none; padding: 0; }
         .payment-list li {
@@ -543,36 +542,39 @@
             upstairsHousehold.forEach(person => {
                 const paid = (personHouseholdSpent[person] || 0) + (personUtilitySpent[person] || 0);
                 const net = paid - targetSharePerPerson;
-                
-                const isPositive = net > 0.0001;
-                const isNegative = net < -0.0001;
 
-                // Net Balance Cell Styling
                 let netClass = '';
-                if (isPositive) netClass = 'val-net-positive';
-                else if (isNegative) netClass = 'val-net-negative';
+                let statusClass = '';
+                let statusText = '';
+                let formattedNet = '';
 
-                // Status Cell Text & Color Styling
-                let statusClass = 'settled-up';
-                let statusText = 'Gets back $0.00';
-
-                if (isPositive) {
+                // POSITIVE OR ZERO BALANCE (>= 0)
+                if (net >= 0) {
+                    netClass = 'val-net-positive';
                     statusClass = 'gets-back';
-                    statusText = `Gets back $${net.toFixed(2)}`;
-                } else if (isNegative) {
+                    statusText = `Gets back $${Math.abs(net).toFixed(2)}`;
+                    formattedNet = `+$${Math.abs(net).toFixed(2)}`;
+                    if (net > 0.005) {
+                        creditors.push({ person, amount: net });
+                    }
+                } 
+                // NEGATIVE BALANCE (< 0)
+                else {
+                    netClass = 'val-net-negative';
                     statusClass = 'owes';
                     statusText = `Owes $${Math.abs(net).toFixed(2)}`;
+                    formattedNet = `-$${Math.abs(net).toFixed(2)}`;
+                    if (net < -0.005) {
+                        debtors.push({ person, amount: Math.abs(net) });
+                    }
                 }
-
-                if (isNegative) debtors.push({ person, amount: Math.abs(net) });
-                if (isPositive) creditors.push({ person, amount: net });
 
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td><strong>${person}</strong></td>
                     <td class="val-paid">$${paid.toFixed(2)}</td>
                     <td class="val-target">$${targetSharePerPerson.toFixed(2)}</td>
-                    <td class="${netClass}">${net > 0 ? '+' : ''}$${net.toFixed(2)}</td>
+                    <td class="${netClass}">${formattedNet}</td>
                     <td class="${statusClass}">${statusText}</td>
                 `;
                 settlementBody.appendChild(row);
