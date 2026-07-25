@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>253 Herron Mews Upstairs Expense Tracker</title>
+    <title>253 Herron Mews Main Floor Expense Tracker</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -120,6 +120,32 @@
             color: #7f8c8d;
             margin-top: 5px;
         }
+
+        /* --- NEW STYLES FOR HIGHLIGHTED VALUES --- */
+        .val-household {
+            font-weight: bold;
+            color: #2e7d32; /* Bold Green */
+        }
+        .val-utility {
+            font-weight: bold;
+            color: #1976d2; /* Bold Blue */
+        }
+        .val-paid {
+            font-weight: bold;
+            color: #6a1b9a; /* Bold Purple */
+        }
+        .val-target {
+            font-weight: bold;
+            color: #e65100; /* Bold Orange */
+        }
+        .val-net-positive {
+            font-weight: bold;
+            color: #00838f; /* Bold Teal */
+        }
+        .val-net-negative {
+            font-weight: bold;
+            color: #d81b60; /* Bold Pinkish Red */
+        }
     </style>
 </head>
 <body>
@@ -133,7 +159,7 @@
             <div id="role-badge"></div>
         </div>
 
-        <h1>253 Herron Mews Upstairs Expense Tracker</h1>
+        <h1>253 Herron Mews Main Floor Expense Tracker</h1>
 
         <!-- Add Expense Form -->
         <div class="card">
@@ -180,7 +206,7 @@
 
         <!-- Monthly Settlement Report (Admin Only) -->
         <div class="card" id="report-card" style="display: none;">
-            <h2>Monthly Settlement Report (Upstairs Household)</h2>
+            <h2>Monthly Settlement Report (Main Floor Household)</h2>
             
             <div class="summary-box">
                 <p><strong>Total Upstairs Household (5-Way):</strong> $<span id="household-total">0.00</span> <em>($<span id="household-share">0.00</span> / person)</em></p>
@@ -193,14 +219,13 @@
                 <p><strong>Main Floor Family Contribution (4/9th Utility Total):</strong> $<span id="mainfloor-total">0.00</span></p>
             </div>
 
-            <h3>1. Spending Breakdown by Person (Total Paid Out of Pocket)</h3>
+            <h3>1. Spending Breakdown by Person</h3>
             <table>
                 <thead>
                     <tr>
                         <th>Person</th>
                         <th>Household Spent</th>
                         <th>Utility Spent</th>
-                        <th>Total Out-of-Pocket Spent</th>
                     </tr>
                 </thead>
                 <tbody id="spending-breakdown-list">
@@ -505,14 +530,12 @@
             upstairsHousehold.forEach(person => {
                 const hSpent = personHouseholdSpent[person] || 0;
                 const uSpent = personUtilitySpent[person] || 0;
-                const totalSpent = hSpent + uSpent;
 
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td><strong>${person}</strong></td>
-                    <td>$${hSpent.toFixed(2)}</td>
-                    <td>$${uSpent.toFixed(2)}</td>
-                    <td><strong>$${totalSpent.toFixed(2)}</strong></td>
+                    <td class="val-household">$${hSpent.toFixed(2)}</td>
+                    <td class="val-utility">$${uSpent.toFixed(2)}</td>
                 `;
                 spendingBody.appendChild(row);
             });
@@ -527,6 +550,7 @@
                 const paid = (personHouseholdSpent[person] || 0) + (personUtilitySpent[person] || 0);
                 const net = paid - targetSharePerPerson;
                 const statusClass = net >= 0 ? 'gets-back' : 'owes';
+                const netClass = net >= 0 ? 'val-net-positive' : 'val-net-negative';
                 const statusText = net >= 0 
                     ? `Gets back $${net.toFixed(2)}` 
                     : `Owes $${Math.abs(net).toFixed(2)}`;
@@ -537,9 +561,9 @@
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td><strong>${person}</strong></td>
-                    <td>$${paid.toFixed(2)}</td>
-                    <td>$${targetSharePerPerson.toFixed(2)}</td>
-                    <td class="${statusClass}">${net > 0 ? '+' : ''}$${net.toFixed(2)}</td>
+                    <td class="val-paid">$${paid.toFixed(2)}</td>
+                    <td class="val-target">$${targetSharePerPerson.toFixed(2)}</td>
+                    <td class="${netClass}">${net > 0 ? '+' : ''}$${net.toFixed(2)}</td>
                     <td class="${statusClass}">${statusText}</td>
                 `;
                 settlementBody.appendChild(row);
