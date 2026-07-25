@@ -553,7 +553,7 @@
                     netClass = 'val-net-positive';
                     statusClass = 'gets-back';
                     statusText = `Gets back $${Math.abs(net).toFixed(2)}`;
-                    formattedNet = `+$${Math.abs(net).toFixed(2)}`;
+                    formattedNet = `$${Math.abs(net).toFixed(2)}`; // No '+' sign
                     if (net > 0.005) {
                         creditors.push({ person, amount: net });
                     }
