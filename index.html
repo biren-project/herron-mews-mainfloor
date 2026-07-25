@@ -131,13 +131,6 @@
         .val-target { font-weight: bold; color: #e65100; }
         .val-net-positive { font-weight: bold; color: #27ae60; }
         .val-net-negative { font-weight: bold; color: #c0392b; }
-        .report-subtitle {
-            color: #7f8c8d;
-            font-size: 14px;
-            margin-top: -8px;
-            margin-bottom: 15px;
-            font-weight: 600;
-        }
     </style>
 </head>
 <body>
@@ -199,7 +192,6 @@
         <!-- Cumulative Settlement Report (Admin Only) -->
         <div class="card" id="report-card" style="display: none;">
             <h2 id="report-title">Settlement Report (Main Floor Household)</h2>
-            <div id="report-date-range" class="report-subtitle"></div>
             
             <div class="summary-box">
                 <p><strong>Total Upstairs Household (5-Way):</strong> $<span id="household-total">0.00</span> <em>($<span id="household-share">0.00</span> / person)</em></p>
@@ -453,7 +445,7 @@
             if (!isAdmin) return;
 
             if (expenses.length === 0) {
-                alert("No expenses recorded yet to generate a report.");
+                document.getElementById('report-card').style.display = 'none';
                 return;
             }
 
@@ -462,7 +454,12 @@
             const firstDate = dates[0];
             const lastDate = dates[dates.length - 1];
 
-            document.getElementById('report-date-range').innerText = `Period: ${firstDate} to ${lastDate}`;
+            // Embed Start and End Dates directly in the Title Header
+            if (firstDate === lastDate) {
+                document.getElementById('report-title').innerText = `Settlement Report (${firstDate})`;
+            } else {
+                document.getElementById('report-title').innerText = `Settlement Report (${firstDate} to ${lastDate})`;
+            }
 
             let householdTotal = 0;
             let shawTotal = 0;
