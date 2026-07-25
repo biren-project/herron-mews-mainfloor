@@ -171,10 +171,10 @@
                 <input type="date" id="date" required>
                 <select id="category" required>
                     <option value="household" selected>Upstairs General Household (5-Way Split)</option>
-                    <!-- Admin Only Utility Options -->
-                    <option value="shaw" class="admin-option">Shaw Internet (5-Way Split)</option>
-                    <option value="enmax" class="admin-option">Enmax Electricity (5-Way Split)</option>
-                    <option value="atco" class="admin-option">Atco Gas (5-Way Split)</option>
+                    <!-- Admin Only Utility Options (Full bill entered, split 9 ways) -->
+                    <option value="shaw" class="admin-option">Shaw Internet (Split 9 Ways)</option>
+                    <option value="enmax" class="admin-option">Enmax Electricity (Split 9 Ways)</option>
+                    <option value="atco" class="admin-option">Atco Gas (Split 9 Ways)</option>
                 </select>
                 <input type="text" id="description" placeholder="Description (e.g. Groceries, Utility Bill)" required>
                 <input type="number" id="amount" placeholder="Amount ($)" step="0.01" min="0" required>
@@ -204,21 +204,22 @@
                 </tbody>
             </table>
             <br>
-            <button id="calc-btn" class="btn-calc" onclick="calculateSettlement()" style="display: none;">Calculate Monthly Settlement</button>
+            <button id="calc-btn" class="btn-calc" onclick="calculateSettlement()" style="display: none;">Calculate Overall Settlement</button>
         </div>
 
-        <!-- Monthly Settlement Report (Admin Only) -->
+        <!-- Cumulative Settlement Report (Admin Only) -->
         <div class="card" id="report-card" style="display: none;">
-            <h2>Monthly Settlement Report (Main Floor Household)</h2>
+            <h2 id="report-title">Settlement Report (Main Floor Household)</h2>
+            <p id="report-date-range" style="color: #7f8c8d; font-weight: bold; margin-top: -10px;"></p>
             
             <div class="summary-box">
                 <p><strong>Total Upstairs Household (5-Way):</strong> $<span id="household-total">0.00</span> <em>($<span id="household-share">0.00</span> / person)</em></p>
                 <hr style="border:0; border-top: 1px dashed #ccc; margin: 10px 0;">
-                <p>🌐 <strong>Shaw Internet Total:</strong> $<span id="shaw-total">0.00</span> <em>($<span id="shaw-share">0.00</span> / person)</em></p>
-                <p>⚡ <strong>Enmax Electricity Total:</strong> $<span id="enmax-total">0.00</span> <em>($<span id="enmax-share">0.00</span> / person)</em></p>
-                <p>🔥 <strong>Atco Gas Total:</strong> $<span id="atco-total">0.00</span> <em>($<span id="atco-share">0.00</span> / person)</em></p>
+                <p>🌐 <strong>Shaw Internet Total (Full Bill):</strong> $<span id="shaw-total">0.00</span> <em>($<span id="shaw-share">0.00</span> / person)</em></p>
+                <p>⚡ <strong>Enmax Electricity Total (Full Bill):</strong> $<span id="enmax-total">0.00</span> <em>($<span id="enmax-share">0.00</span> / person)</em></p>
+                <p>🔥 <strong>Atco Gas Total (Full Bill):</strong> $<span id="atco-total">0.00</span> <em>($<span id="atco-share">0.00</span> / person)</em></p>
                 <hr style="border:0; border-top: 1px dashed #ccc; margin: 10px 0;">
-                <p><strong>Combined Utility Total (5-Way):</strong> $<span id="utility-total">0.00</span> <em>($<span id="utility-share">0.00</span> / person)</em></p>
+                <p><strong>Main Floor Utility Share (5/9th Total):</strong> $<span id="utility-total">0.00</span> <em>($<span id="utility-share">0.00</span> / person)</em></p>
             </div>
 
             <h3>1. Spending Breakdown by Person</h3>
@@ -273,7 +274,7 @@
 
         // Main floor household group (5 Members)
         const upstairsHousehold = ["Jigneshkumar", "Jaimin", "Ishanibhabhi", "Viru", "Drashti"]; 
-        const TOTAL_UTILITY_RESIDENTS = 5; 
+        const TOTAL_UTILITY_RESIDENTS = 9; // Total building residents for utility calculations
 
         let expenses = [];
 
@@ -403,9 +404,9 @@
                 }
 
                 let categoryTag = '<span style="color:#2980b9;">Household (5-Way)</span>';
-                if (item.category === 'shaw') categoryTag = '<span style="color:#d35400; font-weight:bold;">Shaw Internet (5-Way)</span>';
-                if (item.category === 'enmax') categoryTag = '<span style="color:#f39c12; font-weight:bold;">Enmax Elec (5-Way)</span>';
-                if (item.category === 'atco') categoryTag = '<span style="color:#e74c3c; font-weight:bold;">Atco Gas (5-Way)</span>';
+                if (item.category === 'shaw') categoryTag = '<span style="color:#d35400; font-weight:bold;">Shaw Internet (9-Way)</span>';
+                if (item.category === 'enmax') categoryTag = '<span style="color:#f39c12; font-weight:bold;">Enmax Elec (9-Way)</span>';
+                if (item.category === 'atco') categoryTag = '<span style="color:#e74c3c; font-weight:bold;">Atco Gas (9-Way)</span>';
 
                 row.innerHTML = `
                     <td>${item.date}</td>
@@ -462,6 +463,18 @@
         function calculateSettlement() {
             if (!isAdmin) return;
 
+            if (expenses.length === 0) {
+                alert("No expenses recorded to calculate report.");
+                return;
+            }
+
+            // Determine Date Range (First Transaction to Last Transaction)
+            const dates = expenses.map(e => e.date).sort();
+            const firstDate = dates[0];
+            const lastDate = dates[dates.length - 1];
+
+            document.getElementById('report-date-range').innerText = `Period: ${firstDate} to ${lastDate}`;
+
             let householdTotal = 0;
             let shawTotal = 0;
             let enmaxTotal = 0;
@@ -490,14 +503,14 @@
                 }
             });
 
-            const utilityTotal = shawTotal + enmaxTotal + atcoTotal;
-
+            // Calculate per-person utility rates based on 9 total residents
             const householdSharePerPerson = householdTotal / upstairsHousehold.length; 
             const shawSharePerPerson = shawTotal / TOTAL_UTILITY_RESIDENTS;         
             const enmaxSharePerPerson = enmaxTotal / TOTAL_UTILITY_RESIDENTS;       
             const atcoSharePerPerson = atcoTotal / TOTAL_UTILITY_RESIDENTS;         
 
             const utilitySharePerPerson = shawSharePerPerson + enmaxSharePerPerson + atcoSharePerPerson;
+            const mainFloorUtilityTotal = utilitySharePerPerson * upstairsHousehold.length; // 5 residents' share
             const targetSharePerPerson = householdSharePerPerson + utilitySharePerPerson;
 
             // Update UI Summary Box
@@ -513,7 +526,7 @@
             document.getElementById('atco-total').innerText = atcoTotal.toFixed(2);
             document.getElementById('atco-share').innerText = atcoSharePerPerson.toFixed(2);
 
-            document.getElementById('utility-total').innerText = utilityTotal.toFixed(2);
+            document.getElementById('utility-total').innerText = mainFloorUtilityTotal.toFixed(2);
             document.getElementById('utility-share').innerText = utilitySharePerPerson.toFixed(2);
 
             // Populate Spending Breakdown Table
