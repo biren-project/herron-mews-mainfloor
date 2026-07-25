@@ -91,9 +91,9 @@
         }
         th { background-color: #f8f9fa; }
 
-        /* --- STATUS COLUMN STYLING --- */
-        .owes { color: #c0392b; font-weight: bold; }        /* Bold Red */
-        .gets-back { color: #27ae60; font-weight: bold; }   /* Bold Green */
+        /* STATUS COLUMN STYLING */
+        .owes { color: #c0392b; font-weight: bold; }        
+        .gets-back { color: #27ae60; font-weight: bold; }   
 
         .payment-list { list-style: none; padding: 0; }
         .payment-list li {
@@ -124,30 +124,19 @@
             margin-top: 5px;
         }
 
-        /* --- STYLES FOR HIGHLIGHTED TABLE VALUES --- */
-        .val-household {
-            font-weight: bold;
-            color: #2e7d32;
-        }
-        .val-utility {
-            font-weight: bold;
-            color: #1976d2;
-        }
-        .val-paid {
-            font-weight: bold;
-            color: #6a1b9a;
-        }
-        .val-target {
-            font-weight: bold;
-            color: #e65100;
-        }
-        .val-net-positive {
-            font-weight: bold;
-            color: #27ae60; /* Bold Green */
-        }
-        .val-net-negative {
-            font-weight: bold;
-            color: #c0392b; /* Bold Red */
+        /* HIGHLIGHTED TABLE VALUES */
+        .val-household { font-weight: bold; color: #2e7d32; }
+        .val-utility { font-weight: bold; color: #1976d2; }
+        .val-paid { font-weight: bold; color: #6a1b9a; }
+        .val-target { font-weight: bold; color: #e65100; }
+        .val-net-positive { font-weight: bold; color: #27ae60; }
+        .val-net-negative { font-weight: bold; color: #c0392b; }
+        .report-subtitle {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin-top: -8px;
+            margin-bottom: 15px;
+            font-weight: 600;
         }
     </style>
 </head>
@@ -210,7 +199,7 @@
         <!-- Cumulative Settlement Report (Admin Only) -->
         <div class="card" id="report-card" style="display: none;">
             <h2 id="report-title">Settlement Report (Main Floor Household)</h2>
-            <p id="report-date-range" style="color: #7f8c8d; font-weight: bold; margin-top: -10px;"></p>
+            <div id="report-date-range" class="report-subtitle"></div>
             
             <div class="summary-box">
                 <p><strong>Total Upstairs Household (5-Way):</strong> $<span id="household-total">0.00</span> <em>($<span id="household-share">0.00</span> / person)</em></p>
@@ -464,11 +453,11 @@
             if (!isAdmin) return;
 
             if (expenses.length === 0) {
-                alert("No expenses recorded to calculate report.");
+                alert("No expenses recorded yet to generate a report.");
                 return;
             }
 
-            // Determine Date Range (First Transaction to Last Transaction)
+            // Determine Date Span from First Transaction to Last Transaction
             const dates = expenses.map(e => e.date).sort();
             const firstDate = dates[0];
             const lastDate = dates[dates.length - 1];
@@ -566,7 +555,7 @@
                     netClass = 'val-net-positive';
                     statusClass = 'gets-back';
                     statusText = `Gets back $${Math.abs(net).toFixed(2)}`;
-                    formattedNet = `$${Math.abs(net).toFixed(2)}`; // No '+' sign
+                    formattedNet = `$${Math.abs(net).toFixed(2)}`; 
                     if (net > 0.005) {
                         creditors.push({ person, amount: net });
                     }
