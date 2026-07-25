@@ -187,7 +187,7 @@
         <!-- Logged Expenses View -->
         <div class="card">
             <button id="clear-btn" class="btn-clear" onclick="clearAllData()" style="display: none;">Reset / Clear All</button>
-            <h2 id="log-title">Logged Expenses</h2>
+            <h2 id="log-title">All Logged Expenses</h2>
 
             <table>
                 <thead>
@@ -269,8 +269,8 @@
 
     <script>
         // --- JSONBIN.IO CONFIGURATION ---
-        const JSONBIN_BIN_ID = "CREATE_A_NEW_BIN_FOR_UPSTAIRS_OR_REUSE_EXISTING"; 
-        const JSONBIN_MASTER_KEY = "$2a$10$aGsMHmzawGqngUYQk4byNO6eOgVEFFObkr5LyuKv1hQ73QECFOWN2";
+        const JSONBIN_BIN_ID = "6a640bd8da38895dfe8c7903"; 
+        const JSONBIN_MASTER_KEY = "$2a$10$yjx9LlbvtXkus3Ny9sNE3eSaqE1czDp..yFA6lBccOwHmG.KM7Vp2";
 
         // Main floor household group (5 Members)
         const upstairsHousehold = ["Jigneshkumar", "Jaimin", "Ishanibhabhi", "Viru", "Drashti"]; 
@@ -299,10 +299,8 @@
                 document.getElementById('clear-btn').style.display = 'block';
                 document.getElementById('calc-btn').style.display = 'block';
                 document.getElementById('actions-col').style.display = 'table-cell';
-                document.getElementById('log-title').innerText = 'All Logged Expenses (Master Log)';
             } else {
                 document.getElementById('role-badge').innerHTML = '<span class="user-badge">PERSONAL ACCOUNT</span>';
-                document.getElementById('log-title').innerText = `Your Submitted Expenses (${currentUser})`;
                 
                 // REMOVE Utility options completely from the dropdown for non-admin users
                 const adminOptions = document.querySelectorAll('.admin-option');
@@ -379,24 +377,20 @@
             renderExpenses();
         });
 
-        // Render Expenses Table
+        // Render Expenses Table (Visible to everyone)
         function renderExpenses() {
             const list = document.getElementById('expense-list');
             list.innerHTML = '';
 
-            const userExpenses = isAdmin 
-                ? expenses 
-                : expenses.filter(item => item.paidBy === currentUser);
-
-            if (userExpenses.length === 0) {
+            if (expenses.length === 0) {
                 const colSpan = isAdmin ? 6 : 5;
                 list.innerHTML = `<tr><td colspan="${colSpan}">No expenses recorded yet.</td></tr>`;
                 return;
             }
 
-            userExpenses.sort((a, b) => new Date(b.date) - new Date(a.date));
+            expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-            userExpenses.forEach(item => {
+            expenses.forEach(item => {
                 const row = document.createElement('tr');
                 
                 let actionsCell = '';
