@@ -264,8 +264,9 @@
         const currentUser = urlParams.get('user');
         const currentRole = urlParams.get('role');
         
-        // STRICT ADMIN CHECK: Only Jigneshkumar with role=admin gets admin rights
-        const isAdmin = (currentUser === 'Jigneshkumar' && currentRole === 'admin');
+        // ADMIN CHECK: Allow either Jigneshkumar or Jaimin with role=admin
+        const adminUsers = ['Jigneshkumar', 'Jaimin'];
+        const isAdmin = (adminUsers.includes(currentUser) && currentRole === 'admin');
 
         // Validate user identity from URL
         if (!currentUser || !upstairsHousehold.includes(currentUser)) {
