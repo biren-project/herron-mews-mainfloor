@@ -444,21 +444,19 @@
         function calculateSettlement() {
             if (!isAdmin) return;
 
-            if (expenses.length === 0) {
-                document.getElementById('report-card').style.display = 'none';
-                return;
-            }
+            // Determine Date Span if expenses exist
+            if (expenses.length > 0) {
+                const dates = expenses.map(e => e.date).sort();
+                const firstDate = dates[0];
+                const lastDate = dates[dates.length - 1];
 
-            // Determine Date Span from First Transaction to Last Transaction
-            const dates = expenses.map(e => e.date).sort();
-            const firstDate = dates[0];
-            const lastDate = dates[dates.length - 1];
-
-            // Embed Start and End Dates directly in the Title Header
-            if (firstDate === lastDate) {
-                document.getElementById('report-title').innerText = `Settlement Report (${firstDate})`;
+                if (firstDate === lastDate) {
+                    document.getElementById('report-title').innerText = `Settlement Report (${firstDate})`;
+                } else {
+                    document.getElementById('report-title').innerText = `Settlement Report (${firstDate} to ${lastDate})`;
+                }
             } else {
-                document.getElementById('report-title').innerText = `Settlement Report (${firstDate} to ${lastDate})`;
+                document.getElementById('report-title').innerText = `Settlement Report (Main Floor Household)`;
             }
 
             let householdTotal = 0;
