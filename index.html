@@ -196,7 +196,7 @@
                 </div>
             </div>
 
-            <button id="clear-btn" class="btn-clear" onclick="clearAllData()" style="display: none; margin-bottom: 10px;">Reset Selected Month</button>
+            <button id="clear-btn" class="btn-clear" onclick="clearAllData()" style="display: none; margin-bottom: 10px;">Archive Selected Month</button>
 
             <table>
                 <thead>
@@ -383,8 +383,11 @@
             const dropdown = document.getElementById('month-filter');
             const currentYM = getLocalMonthString();
             
-            // Extract distinct YYYY-MM entries from expenses + current month
-            const monthSet = new Set(expenses.map(e => e.date ? e.date.slice(0, 7) : ''));
+            // Filter active (non-archived) expenses for dropdown populating
+            const activeExpenses = expenses.filter(e => !e.archived);
+
+            // Extract distinct YYYY-MM entries from active expenses + current month
+            const monthSet = new Set(activeExpenses.map(e => e.date ? e.date.slice(0, 7) : ''));
             monthSet.add(currentYM);
             monthSet.delete('');
 
@@ -482,7 +485,7 @@
             submitBtn.innerText = 'Saving Expense...';
 
             const newExpenseMonth = date.slice(0, 7);
-            expenses.push({ id: Date.now(), date, category, paidBy: currentUser, description, amount });
+            expenses.push({ id: Date.now(), date, category, paidBy: currentUser, description, amount, archived: false });
             
             // Switch dropdown view to match the newly added entry's month
             selectedMonth = newExpenseMonth;
@@ -499,9 +502,9 @@
             submitBtn.innerText = originalText;
         });
 
-        // Filter helper
+        // Filter helper: returns ONLY active (non-archived) expenses for the selected month
         function getFilteredExpenses() {
-            return expenses.filter(e => e.date && e.date.startsWith(selectedMonth));
+            return expenses.filter(e => !e.archived && e.date && e.date.startsWith(selectedMonth));
         }
 
         // Render Expenses Table (Filtered by Month & XSS Protected)
@@ -521,7 +524,7 @@
 
             if (filtered.length === 0) {
                 const colSpan = isAdmin ? 6 : 5;
-                list.innerHTML = `<tr><td colspan="${colSpan}">No expenses recorded for ${monthLabel}.</td></tr>`;
+                list.innerHTML = `<tr><td colspan="${colSpan}">No active expenses recorded for ${monthLabel}.</td></tr>`;
                 return;
             }
 
@@ -761,45 +764,73 @@
             document.getElementById('report-card').style.display = 'block';
         }
 
-        // CSV Export Feature
+        // Mobile-Optimized UTF-8 Blob CSV Export Feature
         function exportToCSV() {
             const filtered = getFilteredExpenses();
 
             if (filtered.length === 0) {
-                alert('No expenses recorded for this month to export.');
+                alert('No active expenses recorded for this month to export.');
                 return;
             }
 
-            let csvContent = "data:text/csv;charset=utf-8,Date,Paid By,Category,Description,Amount\n";
+            // Standard Header Row
+            let csvContent = "Date,Paid By,Category,Description,Amount\n";
+
+            // Process Each Row Safely
             filtered.forEach(e => {
-                const escapedDesc = e.description ? e.description.replace(/"/g, '""') : '';
-                const row = `"${e.date}","${e.paidBy}","${e.category}","${escapedDesc}",${e.amount}`;
+                const escapedDesc = e.description ? `"${e.description.replace(/"/g, '""')}"` : '""';
+                const row = `"${e.date}","${e.paidBy}","${e.category}",${escapedDesc},${e.amount}`;
                 csvContent += row + "\n";
             });
 
-            const encodedUri = encodeURI(csvContent);
+            // \uFEFF (UTF-8 BOM) ensures Mobile Excel / Numbers / Google Sheets parse formatting correctly
+            const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+
             const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
+            link.setAttribute("href", url);
             link.setAttribute("download", `MainFloor_Expenses_${selectedMonth}.csv`);
             document.body.appendChild(link);
+            
             link.click();
+
+            // Clean up DOM and memory
             document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(url), 100);
         }
 
-        // Admin Action: Reset Selected Month's Data
+        // Admin Action: Soft Delete / Archive Selected Month's Data
         async function clearAllData() {
             if (!isAdmin) return;
 
             const [year, month] = selectedMonth.split('-');
             const monthLabel = new Date(year, month - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
 
-            if (confirm(`Admin Warning: Clear all recorded expenses for ${monthLabel}?`)) {
-                expenses = expenses.filter(e => !e.date || !e.date.startsWith(selectedMonth));
-                updateMonthDropdown();
-                renderExpenses();
-                await saveExpensesToCloud();
-                document.getElementById('report-card').style.display = 'none';
+            const activeMonthExpenses = expenses.filter(e => !e.archived && e.date && e.date.startsWith(selectedMonth));
+
+            if (activeMonthExpenses.length === 0) {
+                alert(`No active expenses recorded for ${monthLabel} to archive.`);
+                return;
             }
+
+            const confirmed = confirm(
+                `Archive ${activeMonthExpenses.length} expense(s) for ${monthLabel}?\n\n` +
+                `This will hide them from calculations and logs, but they will remain safely stored in the cloud database.`
+            );
+
+            if (!confirmed) return;
+
+            // Mark expenses for the selected month as archived
+            expenses.forEach(e => {
+                if (e.date && e.date.startsWith(selectedMonth)) {
+                    e.archived = true;
+                }
+            });
+
+            await saveExpensesToCloud();
+            updateMonthDropdown();
+            renderExpenses();
+            document.getElementById('report-card').style.display = 'none';
         }
     </script>
 </body>
