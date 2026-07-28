@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>253 Herron Mews Main Floor Household Expense Tracker</title>
     <style>
+        /* Global Reset & Base Styles */
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             max-width: 850px;
@@ -13,7 +18,25 @@
             background-color: #f4f6f8;
             color: #333;
         }
-        h1, h2, h3 { color: #1a252f; margin-top: 0; }
+
+        h1 {
+            font-size: 1.8rem;
+            color: #1a252f;
+            margin-top: 0;
+        }
+
+        h2 {
+            font-size: 1.4rem;
+            color: #1a252f;
+            margin-top: 0;
+        }
+
+        h3 {
+            font-size: 1.1rem;
+            color: #1a252f;
+            margin-top: 0;
+        }
+
         .card {
             background: #fff;
             padding: 20px;
@@ -21,6 +44,7 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.08);
             margin-bottom: 20px;
         }
+
         .user-banner {
             background: #2c3e50;
             color: white;
@@ -31,6 +55,7 @@
             justify-content: space-between;
             margin-bottom: 20px;
         }
+
         .admin-badge {
             background-color: #f39c12;
             color: #fff;
@@ -39,6 +64,7 @@
             font-size: 12px;
             font-weight: bold;
         }
+
         .user-badge {
             background-color: #3498db;
             color: #fff;
@@ -47,19 +73,23 @@
             font-size: 12px;
             font-weight: bold;
         }
+
         .form-group {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
             margin-bottom: 15px;
         }
+
         input, select, button {
             padding: 10px;
             font-size: 14px;
             border: 1px solid #ccc;
             border-radius: 4px;
         }
+
         input, select { flex: 1; min-width: 120px; }
+
         button {
             background-color: #27ae60;
             color: white;
@@ -67,32 +97,54 @@
             cursor: pointer;
             font-weight: bold;
         }
+
         button:hover { background-color: #219150; }
         button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+
         .btn-calc { background-color: #2980b9; }
         .btn-calc:hover { background-color: #1f6391; }
         .btn-export { background-color: #16a085; }
         .btn-export:hover { background-color: #117864; }
         .btn-clear { background-color: #e74c3c; float: right; }
         .btn-clear:hover { background-color: #c0392b; }
+
         .btn-action {
             padding: 4px 8px;
             font-size: 12px;
             margin-right: 4px;
         }
+
         .btn-edit { background-color: #f39c12; }
         .btn-delete { background-color: #e74c3c; }
+
+        /* Responsive Table Formatting */
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin-top: 10px;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
+            word-break: normal;
         }
+
         th, td {
             text-align: left;
-            padding: 10px;
+            padding: 10px 8px;
             border-bottom: 1px solid #ddd;
+            white-space: nowrap;
         }
+
         th { background-color: #f8f9fa; }
+
+        /* Description column auto-wraps so long text doesn't distort rows */
+        td.desc-cell {
+            white-space: normal;
+            min-width: 150px;
+        }
 
         /* HEADER CONTROLS */
         .card-header-flex {
@@ -103,6 +155,7 @@
             gap: 10px;
             margin-bottom: 15px;
         }
+
         .month-select-container {
             display: flex;
             align-items: center;
@@ -124,6 +177,7 @@
             border-radius: 0 4px 4px 0;
             font-size: 15px;
         }
+
         .no-access {
             text-align: center;
             padding: 40px;
@@ -131,6 +185,7 @@
             border-radius: 8px;
             color: #e74c3c;
         }
+
         .summary-box {
             background: #f8f9fa;
             border: 1px solid #e2e8f0;
@@ -138,6 +193,7 @@
             border-radius: 6px;
             margin-bottom: 15px;
         }
+
         .sync-status {
             font-size: 12px;
             color: #7f8c8d;
@@ -151,6 +207,59 @@
         .val-target { font-weight: bold; color: #e65100; }
         .val-net-positive { font-weight: bold; color: #27ae60; }
         .val-net-negative { font-weight: bold; color: #c0392b; }
+
+        /* Mobile Adjustments */
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+                margin: 10px auto;
+            }
+
+            h1 { font-size: 1.4rem; }
+            h2 { font-size: 1.2rem; }
+
+            .card {
+                padding: 15px;
+            }
+
+            .user-banner {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+
+            .form-group {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            input, select, button {
+                width: 100%;
+                min-width: 100%;
+            }
+
+            .card-header-flex {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .month-select-container {
+                flex-direction: column;
+                align-items: stretch;
+                width: 100%;
+            }
+
+            .btn-clear {
+                float: none;
+                width: 100%;
+                margin-bottom: 15px;
+            }
+
+            th, td {
+                padding: 8px 6px;
+                font-size: 13px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -198,21 +307,23 @@
 
             <button id="clear-btn" class="btn-clear" onclick="clearAllData()" style="display: none; margin-bottom: 10px;">Archive Selected Month</button>
 
-            <table>
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Paid By</th>
-                        <th>Category</th>
-                        <th>Description</th>
-                        <th>Amount ($)</th>
-                        <th id="actions-col" style="display: none;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="expense-list">
-                    <!-- Expenses render here -->
-                </tbody>
-            </table>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Paid By</th>
+                            <th>Category</th>
+                            <th>Description</th>
+                            <th>Amount ($)</th>
+                            <th id="actions-col" style="display: none;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="expense-list">
+                        <!-- Expenses render here -->
+                    </tbody>
+                </table>
+            </div>
             <br>
             <button id="calc-btn" class="btn-calc" onclick="calculateSettlement()" style="display: none;">Calculate Settlement for Selected Month</button>
         </div>
@@ -232,18 +343,20 @@
             </div>
 
             <h3>1. Spending Breakdown by Person</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Person</th>
-                        <th>Household Spent</th>
-                        <th>Utility Spent</th>
-                    </tr>
-                </thead>
-                <tbody id="spending-breakdown-list">
-                    <!-- Spending breakdown renders here -->
-                </tbody>
-            </table>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Person</th>
+                            <th>Household Spent</th>
+                            <th>Utility Spent</th>
+                        </tr>
+                    </thead>
+                    <tbody id="spending-breakdown-list">
+                        <!-- Spending breakdown renders here -->
+                    </tbody>
+                </table>
+            </div>
 
             <br>
 
@@ -253,20 +366,22 @@
             </ul>
 
             <h3>3. Individual Balances & Settlement</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Person</th>
-                        <th>Total Paid</th>
-                        <th>Target Share</th>
-                        <th>Net Balance</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody id="settlement-list">
-                    <!-- Balance summaries populate here -->
-                </tbody>
-            </table>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Person</th>
+                            <th>Total Paid</th>
+                            <th>Target Share</th>
+                            <th>Net Balance</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="settlement-list">
+                        <!-- Balance summaries populate here -->
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
