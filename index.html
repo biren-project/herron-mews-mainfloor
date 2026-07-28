@@ -4,6 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>253 Herron Mews Main Floor Household Expense Tracker</title>
+
+    <!-- PWA & Mobile Web App Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Main Floor Expenses">
+    <meta name="theme-color" content="#2c3e50">
+
+    <!-- Embedded Web Application Icon -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232c3e50'/><text x='50%' y='65%' font-size='50' text-anchor='middle' fill='%2327ae60'>$</text></svg>">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232c3e50'/><text x='50%' y='65%' font-size='50' text-anchor='middle' fill='%2327ae60'>$</text></svg>">
+
     <style>
         /* Global Reset & Base Styles */
         * {
@@ -12,7 +24,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 850px;
+            max-width: 900px;
             margin: 30px auto;
             padding: 20px;
             background-color: #f4f6f8;
@@ -56,64 +68,24 @@
             margin-bottom: 20px;
         }
 
-        .admin-badge {
-            background-color: #f39c12;
-            color: #fff;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
-        }
+        .admin-badge { background-color: #f39c12; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .user-badge { background-color: #3498db; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
 
-        .user-badge {
-            background-color: #3498db;
-            color: #fff;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
-        .form-group {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 15px;
-        }
-
-        input, select, button {
-            padding: 10px;
-            font-size: 14px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-
+        .form-group { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
+        input, select, button { padding: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; }
         input, select { flex: 1; min-width: 120px; }
-
-        button {
-            background-color: #27ae60;
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
+        
+        button { background-color: #27ae60; color: white; border: none; cursor: pointer; font-weight: bold; }
         button:hover { background-color: #219150; }
         button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
-
+        
         .btn-calc { background-color: #2980b9; }
         .btn-calc:hover { background-color: #1f6391; }
         .btn-export { background-color: #16a085; }
         .btn-export:hover { background-color: #117864; }
         .btn-clear { background-color: #e74c3c; float: right; }
         .btn-clear:hover { background-color: #c0392b; }
-
-        .btn-action {
-            padding: 4px 8px;
-            font-size: 12px;
-            margin-right: 4px;
-        }
-
+        .btn-action { padding: 4px 8px; font-size: 12px; margin-right: 4px; }
         .btn-edit { background-color: #f39c12; }
         .btn-delete { background-color: #e74c3c; }
 
@@ -140,33 +112,19 @@
 
         th { background-color: #f8f9fa; }
 
-        /* Description column auto-wraps so long text doesn't distort rows */
         td.desc-cell {
             white-space: normal;
             min-width: 150px;
         }
 
-        /* HEADER CONTROLS */
-        .card-header-flex {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-
-        .month-select-container {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: bold;
-            font-size: 14px;
-        }
-
-        /* STATUS COLUMN STYLING */
-        .owes { color: #c0392b; font-weight: bold; }        
-        .gets-back { color: #27ae60; font-weight: bold; }   
+        .owes { color: #c0392b; font-weight: bold; }
+        .gets-back { color: #27ae60; font-weight: bold; }
+        .val-household { font-weight: bold; color: #2e7d32; }
+        .val-utility { font-weight: bold; color: #1976d2; }
+        .val-paid { font-weight: bold; color: #6a1b9a; }
+        .val-target { font-weight: bold; color: #e65100; }
+        .val-net-positive { font-weight: bold; color: #27ae60; }
+        .val-net-negative { font-weight: bold; color: #c0392b; }
 
         .payment-list { list-style: none; padding: 0; }
         .payment-list li {
@@ -178,35 +136,12 @@
             font-size: 15px;
         }
 
-        .no-access {
-            text-align: center;
-            padding: 40px;
-            background: #fff;
-            border-radius: 8px;
-            color: #e74c3c;
-        }
-
-        .summary-box {
-            background: #f8f9fa;
-            border: 1px solid #e2e8f0;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 15px;
-        }
-
-        .sync-status {
-            font-size: 12px;
-            color: #7f8c8d;
-            margin-top: 5px;
-        }
-
-        /* HIGHLIGHTED TABLE VALUES */
-        .val-household { font-weight: bold; color: #2e7d32; }
-        .val-utility { font-weight: bold; color: #1976d2; }
-        .val-paid { font-weight: bold; color: #6a1b9a; }
-        .val-target { font-weight: bold; color: #e65100; }
-        .val-net-positive { font-weight: bold; color: #27ae60; }
-        .val-net-negative { font-weight: bold; color: #c0392b; }
+        .no-access { text-align: center; padding: 40px; background: #fff; border-radius: 8px; color: #e74c3c; }
+        .summary-box { background: #f8f9fa; border: 1px solid #e2e8f0; padding: 15px; border-radius: 6px; margin-bottom: 15px; }
+        .sync-status { font-size: 12px; color: #7f8c8d; margin-top: 5px; }
+        
+        .filter-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+        .admin-filter-box { margin-top: 15px; padding-top: 15px; border-top: 1px dashed #ccc; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
         /* Mobile Adjustments */
         @media (max-width: 600px) {
@@ -238,15 +173,16 @@
                 min-width: 100%;
             }
 
-            .card-header-flex {
+            .filter-header {
                 flex-direction: column;
                 align-items: stretch;
             }
 
-            .month-select-container {
+            .filter-header > div {
+                display: flex;
                 flex-direction: column;
-                align-items: stretch;
                 width: 100%;
+                gap: 8px !important;
             }
 
             .btn-clear {
@@ -296,16 +232,16 @@
 
         <!-- Logged Expenses View -->
         <div class="card">
-            <div class="card-header-flex">
-                <h2 id="log-title" style="margin:0;">Logged Expenses</h2>
-                <div class="month-select-container">
-                    <label for="month-filter">View Month:</label>
-                    <select id="month-filter" onchange="onMonthFilterChange()"></select>
+            <button id="clear-btn" class="btn-clear" onclick="clearAllData()" style="display: none;">Archive Selected Month</button>
+            
+            <div class="filter-header">
+                <h2 id="log-title" style="margin: 0;">Logged Expenses (Current Month)</h2>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <label for="month-filter"><strong>View Month:</strong> </label>
+                    <select id="month-filter" onchange="onMonthFilterChange()" style="padding: 5px 10px; min-width: 150px;"></select>
                     <button class="btn-export" onclick="exportToCSV()" title="Download CSV for Selected Month">Export CSV</button>
                 </div>
             </div>
-
-            <button id="clear-btn" class="btn-clear" onclick="clearAllData()" style="display: none; margin-bottom: 10px;">Archive Selected Month</button>
 
             <div class="table-responsive">
                 <table>
@@ -324,8 +260,10 @@
                     </tbody>
                 </table>
             </div>
-            <br>
-            <button id="calc-btn" class="btn-calc" onclick="calculateSettlement()" style="display: none;">Calculate Settlement for Selected Month</button>
+            
+            <div id="admin-month-filter" class="admin-filter-box" style="display: none;">
+                <button id="calc-btn" class="btn-calc" onclick="calculateSettlement()">Calculate Settlement for Selected Month</button>
+            </div>
         </div>
 
         <!-- Cumulative Settlement Report (Admin Only) -->
@@ -413,9 +351,11 @@
 
         // Parse URL Parameters
         const urlParams = new URLSearchParams(window.location.search);
-        const currentUser = urlParams.get('user');
+        const rawUser = urlParams.get('user');
         const currentRole = urlParams.get('role');
         
+        const currentUser = upstairsHousehold.find(u => u.toLowerCase() === (rawUser || '').toLowerCase()) || rawUser;
+
         // ADMIN CHECK: Allow either Jigneshkumar or Jaimin with role=admin
         const adminUsers = ['Jigneshkumar', 'Jaimin'];
         const isAdmin = (adminUsers.includes(currentUser) && currentRole === 'admin');
@@ -431,7 +371,7 @@
             if (isAdmin) {
                 document.getElementById('role-badge').innerHTML = '<span class="admin-badge">ADMIN MODE</span>';
                 document.getElementById('clear-btn').style.display = 'block';
-                document.getElementById('calc-btn').style.display = 'block';
+                document.getElementById('admin-month-filter').style.display = 'flex';
                 document.getElementById('actions-col').style.display = 'table-cell';
             } else {
                 document.getElementById('role-badge').innerHTML = '<span class="user-badge">PERSONAL ACCOUNT</span>';
