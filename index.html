@@ -4,6 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>253 Herron Mews Main Floor Household Expense Tracker</title>
+
+    <!-- PWA & Mobile Web App Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Expense Tracker">
+    <meta name="theme-color" content="#2c3e50">
+
+    <!-- Embedded Web Application Icon -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232c3e50'/><text x='50%' y='65%' font-size='50' text-anchor='middle' fill='%2327ae60'>$</text></svg>">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232c3e50'/><text x='50%' y='65%' font-size='50' text-anchor='middle' fill='%2327ae60'>$</text></svg>">
+
     <style>
         /* Global Reset & Base Styles */
         * {
@@ -140,7 +152,6 @@
 
         th { background-color: #f8f9fa; }
 
-        /* Description column auto-wraps so long text doesn't distort rows */
         td.desc-cell {
             white-space: normal;
             min-width: 150px;
@@ -282,7 +293,6 @@
                 <input type="date" id="date" required>
                 <select id="category" required>
                     <option value="household" selected>General Household (5-Way Split)</option>
-                    <!-- Admin Only Utility Options (Full bill entered, split 9 ways) -->
                     <option value="shaw" class="admin-option">Shaw Internet (Split 9 Ways)</option>
                     <option value="enmax" class="admin-option">Enmax Electricity (Split 9 Ways)</option>
                     <option value="atco" class="admin-option">Atco Gas (Split 9 Ways)</option>
@@ -291,7 +301,7 @@
                 <input type="number" id="amount" placeholder="Amount ($)" step="0.01" min="0.01" required>
                 <button type="submit" id="submit-btn">Submit Expense</button>
             </form>
-            <div id="sync-status" class="sync-status">Connecting to Cloud Data Sync...</div>
+            <div id="sync-status" class="sync-status">Connecting to Secure Cloud Proxy...</div>
         </div>
 
         <!-- Logged Expenses View -->
@@ -328,7 +338,7 @@
             <button id="calc-btn" class="btn-calc" onclick="calculateSettlement()" style="display: none;">Calculate Settlement for Selected Month</button>
         </div>
 
-        <!-- Cumulative Settlement Report (Admin Only) -->
+        <!-- Settlement Report -->
         <div class="card" id="report-card" style="display: none;">
             <h2 id="report-title">Settlement Report (Main Floor Household)</h2>
             
@@ -392,17 +402,16 @@
     </div>
 
     <script>
-        // --- JSONBIN.IO CONFIGURATION ---
-        const JSONBIN_BIN_ID = "6a640bd8da38895dfe8c7903"; 
-        const JSONBIN_ACCESS_KEY = "$2a$10$yjx9LlbvtXkus3Ny9sNE3eSaqE1czDp..yFA6lBccOwHmG.KM7Vp2";
+        // --- SECURE SERVERLESS PROXY CONFIGURATION ---
+        // Replace this URL with your deployed Cloudflare Worker or Vercel Function URL
+        const WORKER_ENDPOINT = "https://your-worker-name.your-subdomain.workers.dev/expenses";
 
         // Main floor household group (5 Members)
         const upstairsHousehold = ["Jigneshkumar", "Jaimin", "Ishanibhabhi", "Viru", "Drashti"]; 
-        const TOTAL_UTILITY_RESIDENTS = 9; // Total building residents for utility calculations
+        const TOTAL_UTILITY_RESIDENTS = 9;
 
         let expenses = [];
 
-        // Helper function for local date string (YYYY-MM)
         function getLocalMonthString(date = new Date()) {
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -416,18 +425,16 @@
         const currentUser = urlParams.get('user');
         const currentRole = urlParams.get('role');
         
-        // ADMIN CHECK: Allow either Jigneshkumar or Jaimin with role=admin
         const adminUsers = ['Jigneshkumar', 'Jaimin'];
         const isAdmin = (adminUsers.includes(currentUser) && currentRole === 'admin');
 
-        // Validate user identity from URL
+        // Validate user identity
         if (!currentUser || !upstairsHousehold.includes(currentUser)) {
             document.getElementById('error-screen').style.display = 'block';
         } else {
             document.getElementById('app-container').style.display = 'block';
             document.getElementById('display-name').innerText = currentUser;
             
-            // Set Role Badge & Toggle Admin-only controls
             if (isAdmin) {
                 document.getElementById('role-badge').innerHTML = '<span class="admin-badge">ADMIN MODE</span>';
                 document.getElementById('clear-btn').style.display = 'block';
@@ -435,78 +442,67 @@
                 document.getElementById('actions-col').style.display = 'table-cell';
             } else {
                 document.getElementById('role-badge').innerHTML = '<span class="user-badge">PERSONAL ACCOUNT</span>';
-                
-                // REMOVE Utility options completely from the dropdown for non-admin users
                 const adminOptions = document.querySelectorAll('.admin-option');
                 adminOptions.forEach(opt => opt.remove());
                 document.getElementById('category').value = 'household';
             }
 
-            // Set default date using local timezone
             const now = new Date();
             const localDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
             document.getElementById('date').value = localDateStr;
 
-            // Fetch latest expenses from cloud database
             fetchExpensesFromCloud();
         }
 
-        // FETCH EXPENSES FROM CLOUD (with retry & offline cache)
+        // FETCH EXPENSES VIA SERVERLESS PROXY
         async function fetchExpensesFromCloud() {
             const statusEl = document.getElementById('sync-status');
-            statusEl.innerText = 'Syncing cloud data...';
+            statusEl.innerText = 'Syncing securely via serverless proxy...';
             try {
-                const response = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}/latest`, {
-                    headers: { 'X-Access-Key': JSONBIN_ACCESS_KEY }
+                const response = await fetch(WORKER_ENDPOINT, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Server returned HTTP ${response.status}`);
+                    throw new Error(`Proxy error status ${response.status}`);
                 }
 
                 const data = await response.json();
-                expenses = data.record.expenses || [];
+                expenses = data.expenses || [];
                 
-                // Save backup locally
                 localStorage.setItem('cached_expenses_mainfloor', JSON.stringify(expenses));
-
                 statusEl.innerText = 'Connected & Synced';
                 
                 updateMonthDropdown();
                 renderExpenses();
             } catch (err) {
-                console.error('Error fetching cloud data:', err);
+                console.error('Error fetching data via serverless worker:', err);
                 
-                // Fallback to local storage if available
                 const cached = localStorage.getItem('cached_expenses_mainfloor');
                 if (cached) {
                     expenses = JSON.parse(cached);
-                    statusEl.innerText = 'Offline mode: Loaded cached local data. Retrying cloud...';
+                    statusEl.innerText = 'Offline mode: Loaded cached local data. Retrying proxy...';
                     updateMonthDropdown();
                     renderExpenses();
                 } else {
                     statusEl.innerText = 'Sync failed. Retrying in 5 seconds...';
                 }
 
-                // Automatic retry
                 setTimeout(fetchExpensesFromCloud, 5000);
             }
         }
 
-        // DYNAMICALLY GENERATE MONTH DROPDOWN WITH ACTIVE/ARCHIVED LABELS
+        // UPDATE DROPDOWN
         function updateMonthDropdown() {
             const dropdown = document.getElementById('month-filter');
             const currentYM = getLocalMonthString();
             
-            // Filter active (non-archived) expenses for dropdown populating
             const activeExpenses = expenses.filter(e => !e.archived);
-
-            // Extract distinct YYYY-MM entries from active expenses + current month
             const monthSet = new Set(activeExpenses.map(e => e.date ? e.date.slice(0, 7) : ''));
             monthSet.add(currentYM);
             monthSet.delete('');
 
-            // Sort descending (latest month first)
             const sortedMonths = Array.from(monthSet).sort().reverse();
 
             dropdown.innerHTML = '';
@@ -522,7 +518,6 @@
                 dropdown.appendChild(option);
             });
 
-            // Keep user selection if valid, else default to current month
             if (sortedMonths.includes(selectedMonth)) {
                 dropdown.value = selectedMonth;
             } else {
@@ -537,34 +532,30 @@
             document.getElementById('report-card').style.display = 'none';
         }
 
-        // SAVE EXPENSES TO CLOUD
+        // SAVE EXPENSES VIA SERVERLESS PROXY
         async function saveExpensesToCloud() {
             const statusEl = document.getElementById('sync-status');
-            statusEl.innerText = 'Saving to cloud...';
+            statusEl.innerText = 'Saving via serverless proxy...';
 
-            // Always cache locally first
             localStorage.setItem('cached_expenses_mainfloor', JSON.stringify(expenses));
 
             try {
-                const response = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Access-Key': JSONBIN_ACCESS_KEY
-                    },
-                    body: JSON.stringify({ expenses: expenses })
+                const response = await fetch(WORKER_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ expenses: expenses, user: currentUser, role: currentRole })
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Server returned HTTP ${response.status}`);
+                    throw new Error(`Proxy return status ${response.status}`);
                 }
 
                 statusEl.innerText = 'Saved to Cloud';
                 return true;
             } catch (err) {
-                console.error('Error saving to cloud:', err);
+                console.error('Error saving via serverless proxy:', err);
                 statusEl.innerText = 'Cloud save failed! Saved locally.';
-                alert('Warning: Expense was saved locally but could not sync to cloud. Check internet connection.');
+                alert('Warning: Expense was saved locally but could not sync to cloud.');
                 return false;
             }
         }
@@ -581,13 +572,8 @@
             const description = document.getElementById('description').value.trim();
             const amount = parseFloat(document.getElementById('amount').value);
 
-            // Input Validation Checks
-            if (!description) {
-                alert('Please enter a description for the expense.');
-                return;
-            }
-            if (isNaN(amount) || amount <= 0) {
-                alert('Please enter a valid amount greater than $0.00.');
+            if (!description || isNaN(amount) || amount <= 0) {
+                alert('Please enter valid expense details.');
                 return;
             }
 
@@ -595,17 +581,14 @@
                 category = 'household';
             }
 
-            // Disable submit button & show feedback during request
             submitBtn.disabled = true;
             submitBtn.innerText = 'Saving Expense...';
 
             const newExpenseMonth = date.slice(0, 7);
             expenses.push({ id: Date.now(), date, category, paidBy: currentUser, description, amount, archived: false });
             
-            // Switch dropdown view to match the newly added entry's month
             selectedMonth = newExpenseMonth;
             updateMonthDropdown();
-
             renderExpenses();
 
             await saveExpensesToCloud();
@@ -617,18 +600,15 @@
             submitBtn.innerText = originalText;
         });
 
-        // Filter helper: returns ONLY active (non-archived) expenses for the selected month
         function getFilteredExpenses() {
             return expenses.filter(e => !e.archived && e.date && e.date.startsWith(selectedMonth));
         }
 
-        // Render Expenses Table (Filtered by Month & XSS Protected)
         function renderExpenses() {
             const list = document.getElementById('expense-list');
             list.innerHTML = '';
 
             const filtered = getFilteredExpenses();
-
             const currentYM = getLocalMonthString();
             const [year, month] = selectedMonth.split('-');
             const monthLabel = new Date(year, month - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -672,13 +652,11 @@
                     ${actionsCell}
                 `;
 
-                // Safe text assignment to prevent XSS vulnerability
                 row.querySelector('.desc-cell').textContent = item.description;
                 list.appendChild(row);
             });
         }
 
-        // Admin Action: Edit Expense
         async function editExpense(id) {
             if (!isAdmin) return;
 
@@ -688,19 +666,13 @@
             const newDescription = prompt("Edit Description:", item.description);
             if (newDescription === null) return;
             const trimmedDesc = newDescription.trim();
-            if (!trimmedDesc) {
-                alert("Description cannot be empty.");
-                return;
-            }
+            if (!trimmedDesc) return;
 
             const newAmountStr = prompt("Edit Amount ($):", item.amount);
             if (newAmountStr === null) return;
 
             const newAmount = parseFloat(newAmountStr);
-            if (isNaN(newAmount) || newAmount <= 0) {
-                alert("Please enter a valid amount greater than $0.00.");
-                return;
-            }
+            if (isNaN(newAmount) || newAmount <= 0) return;
 
             item.description = trimmedDesc;
             item.amount = newAmount;
@@ -710,7 +682,6 @@
             document.getElementById('report-card').style.display = 'none';
         }
 
-        // Admin Action: Delete Expense
         async function deleteExpense(id) {
             if (!isAdmin) return;
 
@@ -723,7 +694,6 @@
             }
         }
 
-        // Admin Action: Calculate Settlement & Spending Summary for Selected Month
         function calculateSettlement() {
             if (!isAdmin) return;
 
@@ -733,10 +703,7 @@
 
             document.getElementById('report-title').innerText = `Settlement Report (${monthLabel})`;
 
-            let householdTotal = 0;
-            let shawTotal = 0;
-            let enmaxTotal = 0;
-            let atcoTotal = 0;
+            let householdTotal = 0, shawTotal = 0, enmaxTotal = 0, atcoTotal = 0;
 
             const personHouseholdSpent = {};
             const personUtilitySpent = {};
@@ -761,33 +728,26 @@
                 }
             });
 
-            // Calculate per-person utility rates based on 9 total residents
             const householdSharePerPerson = householdTotal / upstairsHousehold.length; 
             const shawSharePerPerson = shawTotal / TOTAL_UTILITY_RESIDENTS;         
             const enmaxSharePerPerson = enmaxTotal / TOTAL_UTILITY_RESIDENTS;       
             const atcoSharePerPerson = atcoTotal / TOTAL_UTILITY_RESIDENTS;         
 
             const utilitySharePerPerson = shawSharePerPerson + enmaxSharePerPerson + atcoSharePerPerson;
-            const mainFloorUtilityTotal = utilitySharePerPerson * upstairsHousehold.length; // 5 residents' share
+            const mainFloorUtilityTotal = utilitySharePerPerson * upstairsHousehold.length;
             const targetSharePerPerson = householdSharePerPerson + utilitySharePerPerson;
 
-            // Update UI Summary Box
             document.getElementById('household-total').innerText = householdTotal.toFixed(2);
             document.getElementById('household-share').innerText = householdSharePerPerson.toFixed(2);
-            
             document.getElementById('shaw-total').innerText = shawTotal.toFixed(2);
             document.getElementById('shaw-share').innerText = shawSharePerPerson.toFixed(2);
-
             document.getElementById('enmax-total').innerText = enmaxTotal.toFixed(2);
             document.getElementById('enmax-share').innerText = enmaxSharePerPerson.toFixed(2);
-
             document.getElementById('atco-total').innerText = atcoTotal.toFixed(2);
             document.getElementById('atco-share').innerText = atcoSharePerPerson.toFixed(2);
-
             document.getElementById('utility-total').innerText = mainFloorUtilityTotal.toFixed(2);
             document.getElementById('utility-share').innerText = utilitySharePerPerson.toFixed(2);
 
-            // Populate Spending Breakdown Table
             const spendingBody = document.getElementById('spending-breakdown-list');
             spendingBody.innerHTML = '';
 
@@ -804,9 +764,7 @@
                 spendingBody.appendChild(row);
             });
 
-            let debtors = [];
-            let creditors = [];
-
+            let debtors = [], creditors = [];
             const settlementBody = document.getElementById('settlement-list');
             settlementBody.innerHTML = '';
 
@@ -814,30 +772,20 @@
                 const paid = (personHouseholdSpent[person] || 0) + (personUtilitySpent[person] || 0);
                 const net = paid - targetSharePerPerson;
 
-                let netClass = '';
-                let statusClass = '';
-                let statusText = '';
-                let formattedNet = '';
+                let netClass = '', statusClass = '', statusText = '', formattedNet = '';
 
-                // POSITIVE OR ZERO BALANCE (>= 0)
                 if (net >= 0) {
                     netClass = 'val-net-positive';
                     statusClass = 'gets-back';
                     statusText = `Gets back $${Math.abs(net).toFixed(2)}`;
                     formattedNet = `$${Math.abs(net).toFixed(2)}`; 
-                    if (net > 0.005) {
-                        creditors.push({ person, amount: net });
-                    }
-                } 
-                // NEGATIVE BALANCE (< 0)
-                else {
+                    if (net > 0.005) creditors.push({ person, amount: net });
+                } else {
                     netClass = 'val-net-negative';
                     statusClass = 'owes';
                     statusText = `Owes $${Math.abs(net).toFixed(2)}`;
                     formattedNet = `-$${Math.abs(net).toFixed(2)}`;
-                    if (net < -0.005) {
-                        debtors.push({ person, amount: Math.abs(net) });
-                    }
+                    if (net < -0.005) debtors.push({ person, amount: Math.abs(net) });
                 }
 
                 const row = document.createElement('tr');
@@ -879,26 +827,17 @@
             document.getElementById('report-card').style.display = 'block';
         }
 
-        // Mobile-Optimized UTF-8 Blob CSV Export Feature
         function exportToCSV() {
             const filtered = getFilteredExpenses();
+            if (filtered.length === 0) return alert('No active expenses recorded to export.');
 
-            if (filtered.length === 0) {
-                alert('No active expenses recorded for this month to export.');
-                return;
-            }
-
-            // Standard Header Row
             let csvContent = "Date,Paid By,Category,Description,Amount\n";
 
-            // Process Each Row Safely
             filtered.forEach(e => {
                 const escapedDesc = e.description ? `"${e.description.replace(/"/g, '""')}"` : '""';
-                const row = `"${e.date}","${e.paidBy}","${e.category}",${escapedDesc},${e.amount}`;
-                csvContent += row + "\n";
+                csvContent += `"${e.date}","${e.paidBy}","${e.category}",${escapedDesc},${e.amount}\n`;
             });
 
-            // \uFEFF (UTF-8 BOM) ensures Mobile Excel / Numbers / Google Sheets parse formatting correctly
             const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
 
@@ -906,40 +845,25 @@
             link.setAttribute("href", url);
             link.setAttribute("download", `MainFloor_Expenses_${selectedMonth}.csv`);
             document.body.appendChild(link);
-            
             link.click();
 
-            // Clean up DOM and memory
             document.body.removeChild(link);
             setTimeout(() => URL.revokeObjectURL(url), 100);
         }
 
-        // Admin Action: Soft Delete / Archive Selected Month's Data
         async function clearAllData() {
             if (!isAdmin) return;
 
             const [year, month] = selectedMonth.split('-');
             const monthLabel = new Date(year, month - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
-
             const activeMonthExpenses = expenses.filter(e => !e.archived && e.date && e.date.startsWith(selectedMonth));
 
-            if (activeMonthExpenses.length === 0) {
-                alert(`No active expenses recorded for ${monthLabel} to archive.`);
-                return;
-            }
+            if (activeMonthExpenses.length === 0) return alert(`No active expenses to archive.`);
 
-            const confirmed = confirm(
-                `Archive ${activeMonthExpenses.length} expense(s) for ${monthLabel}?\n\n` +
-                `This will hide them from calculations and logs, but they will remain safely stored in the cloud database.`
-            );
+            if (!confirm(`Archive ${activeMonthExpenses.length} expense(s) for ${monthLabel}?`)) return;
 
-            if (!confirmed) return;
-
-            // Mark expenses for the selected month as archived
             expenses.forEach(e => {
-                if (e.date && e.date.startsWith(selectedMonth)) {
-                    e.archived = true;
-                }
+                if (e.date && e.date.startsWith(selectedMonth)) e.archived = true;
             });
 
             await saveExpensesToCloud();
