@@ -313,6 +313,7 @@
                             <th>Target Share</th>
                             <th>Net Balance</th>
                             <th>Status</th>
+                            <th id="settlement-action-col" style="display: none;">Admin Action</th>
                         </tr>
                     </thead>
                     <tbody id="settlement-list">
@@ -339,12 +340,19 @@
         const TOTAL_UTILITY_RESIDENTS = 9; // Total building residents for utility calculations
 
         let expenses = [];
+        let monthlyPayments = {}; // Stores recorded payments/partial payments per month
 
         // Helper function for local date string (YYYY-MM)
         function getLocalMonthString(date = new Date()) {
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
             return `${year}-${month}`;
+        }
+
+        function getPreviousMonthString(currentMonthStr) {
+            const [year, month] = currentMonthStr.split('-').map(Number);
+            const date = new Date(year, month - 2, 1);
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         }
 
         let selectedMonth = getLocalMonthString();
@@ -373,6 +381,7 @@
                 document.getElementById('clear-btn').style.display = 'block';
                 document.getElementById('admin-month-filter').style.display = 'flex';
                 document.getElementById('actions-col').style.display = 'table-cell';
+                document.getElementById('settlement-action-col').style.display = 'table-cell';
             } else {
                 document.getElementById('role-badge').innerHTML = '<span class="user-badge">PERSONAL ACCOUNT</span>';
                 
@@ -406,24 +415,40 @@
 
                 const data = await response.json();
                 expenses = data.record.expenses || [];
+                monthlyPayments = data.record.monthlyPayments || {};
+                
+                if (!monthlyPayments.householdPaid) {
+                    monthlyPayments.householdPaid = {};
+                }
                 
                 // Save backup locally
                 localStorage.setItem('cached_expenses_mainfloor', JSON.stringify(expenses));
+                localStorage.setItem('cached_payments_mainfloor', JSON.stringify(monthlyPayments));
 
                 statusEl.innerText = 'Connected & Synced';
                 
                 updateMonthDropdown();
                 renderExpenses();
+                if (isAdmin) {
+                    calculateSettlement();
+                }
             } catch (err) {
                 console.error('Error fetching cloud data:', err);
                 
                 // Fallback to local storage if available
                 const cached = localStorage.getItem('cached_expenses_mainfloor');
+                const cachedPayments = localStorage.getItem('cached_payments_mainfloor');
                 if (cached) {
                     expenses = JSON.parse(cached);
+                    if (cachedPayments) monthlyPayments = JSON.parse(cachedPayments);
+                    if (!monthlyPayments.householdPaid) monthlyPayments.householdPaid = {};
+
                     statusEl.innerText = 'Offline mode: Loaded cached local data. Retrying cloud...';
                     updateMonthDropdown();
                     renderExpenses();
+                    if (isAdmin) {
+                        calculateSettlement();
+                    }
                 } else {
                     statusEl.innerText = 'Sync failed. Retrying in 5 seconds...';
                 }
@@ -474,7 +499,9 @@
         function onMonthFilterChange() {
             selectedMonth = document.getElementById('month-filter').value;
             renderExpenses();
-            document.getElementById('report-card').style.display = 'none';
+            if (isAdmin && document.getElementById('report-card').style.display === 'block') {
+                calculateSettlement();
+            }
         }
 
         // SAVE EXPENSES TO CLOUD
@@ -484,6 +511,7 @@
 
             // Always cache locally first
             localStorage.setItem('cached_expenses_mainfloor', JSON.stringify(expenses));
+            localStorage.setItem('cached_payments_mainfloor', JSON.stringify(monthlyPayments));
 
             try {
                 const response = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`, {
@@ -492,7 +520,7 @@
                         'Content-Type': 'application/json',
                         'X-Access-Key': JSONBIN_ACCESS_KEY
                     },
-                    body: JSON.stringify({ expenses: expenses })
+                    body: JSON.stringify({ expenses: expenses, monthlyPayments: monthlyPayments })
                 });
 
                 if (!response.ok) {
@@ -504,7 +532,7 @@
             } catch (err) {
                 console.error('Error saving to cloud:', err);
                 statusEl.innerText = 'Cloud save failed! Saved locally.';
-                alert('Warning: Expense was saved locally but could not sync to cloud. Check internet connection.');
+                alert('Warning: Data was saved locally but could not sync to cloud. Check internet connection.');
                 return false;
             }
         }
@@ -547,6 +575,9 @@
             updateMonthDropdown();
 
             renderExpenses();
+            if (isAdmin && document.getElementById('report-card').style.display === 'block') {
+                calculateSettlement();
+            }
 
             await saveExpensesToCloud();
 
@@ -647,7 +678,9 @@
 
             renderExpenses();
             await saveExpensesToCloud();
-            document.getElementById('report-card').style.display = 'none';
+            if (document.getElementById('report-card').style.display === 'block') {
+                calculateSettlement();
+            }
         }
 
         // Admin Action: Delete Expense
@@ -659,13 +692,95 @@
                 updateMonthDropdown();
                 renderExpenses();
                 await saveExpensesToCloud();
-                document.getElementById('report-card').style.display = 'none';
+                if (document.getElementById('report-card').style.display === 'block') {
+                    calculateSettlement();
+                }
             }
+        }
+
+        // Admin Action: Prompt & Record Partial/Full Payment
+        async function promptHouseholdPayment(month, person, fullDueAmount) {
+            if (!isAdmin) return;
+
+            if (!monthlyPayments.householdPaid) {
+                monthlyPayments.householdPaid = {};
+            }
+            if (!monthlyPayments.householdPaid[month]) {
+                monthlyPayments.householdPaid[month] = {};
+            }
+
+            const currentPaidAmount = monthlyPayments.householdPaid[month][person];
+            const isFullyPaid = (currentPaidAmount === true || currentPaidAmount >= fullDueAmount - 0.005);
+
+            if (isFullyPaid) {
+                // Toggle back to unpaid / 0
+                monthlyPayments.householdPaid[month][person] = 0;
+            } else {
+                const defaultVal = fullDueAmount > 0 ? fullDueAmount.toFixed(2) : "0.00";
+                const inputStr = prompt(`Enter payment amount received for ${person} (Total Due: $${defaultVal}):`, defaultVal);
+                if (inputStr === null) return;
+
+                const paidAmt = parseFloat(inputStr);
+                if (isNaN(paidAmt) || paidAmt < 0) {
+                    alert("Please enter a valid payment amount.");
+                    return;
+                }
+                monthlyPayments.householdPaid[month][person] = paidAmt;
+            }
+
+            calculateSettlement();
+            await saveExpensesToCloud();
         }
 
         // Admin Action: Calculate Settlement & Spending Summary for Selected Month
         function calculateSettlement() {
             if (!isAdmin) return;
+
+            const prevMonth = getPreviousMonthString(selectedMonth);
+            let carryforwardDebts = {};
+
+            // 1. Calculate Carryforwards from Previous Month
+            const prevExpenses = expenses.filter(e => !e.archived && e.date && e.date.startsWith(prevMonth));
+            if (prevExpenses.length > 0) {
+                let prevHouseholdTotal = 0;
+                let prevShawTotal = 0, prevEnmaxTotal = 0, prevAtcoTotal = 0;
+                const prevPersonSpent = {};
+                upstairsHousehold.forEach(p => prevPersonSpent[p] = 0);
+
+                prevExpenses.forEach(item => {
+                    if (item.category === 'shaw') prevShawTotal += item.amount;
+                    else if (item.category === 'enmax') prevEnmaxTotal += item.amount;
+                    else if (item.category === 'atco') prevAtcoTotal += item.amount;
+                    else {
+                        prevHouseholdTotal += item.amount;
+                        if (prevPersonSpent[item.paidBy] !== undefined) prevPersonSpent[item.paidBy] += item.amount;
+                    }
+                });
+
+                const prevHouseholdSharePerPerson = prevHouseholdTotal / upstairsHousehold.length;
+                const prevUtilitySharePerPerson = (prevShawTotal + prevEnmaxTotal + prevAtcoTotal) / TOTAL_UTILITY_RESIDENTS;
+                const prevTargetSharePerPerson = prevHouseholdSharePerPerson + prevUtilitySharePerPerson;
+
+                upstairsHousehold.forEach(person => {
+                    const paid = prevPersonSpent[person] || 0;
+                    const prevCarry = monthlyPayments.prevHouseholdCarry ? (monthlyPayments.prevHouseholdCarry[prevMonth]?.[person] || 0) : 0;
+                    const totalTarget = prevTargetSharePerPerson + prevCarry;
+                    const netBeforePayment = paid - totalTarget;
+
+                    if (netBeforePayment < -0.005) {
+                        const totalOwed = Math.abs(netBeforePayment);
+                        const recordVal = monthlyPayments.householdPaid?.[prevMonth]?.[person];
+                        let paidAmount = 0;
+                        if (recordVal === true) paidAmount = totalOwed;
+                        else if (typeof recordVal === 'number') paidAmount = recordVal;
+
+                        const remainingDebt = totalOwed - paidAmount;
+                        if (remainingDebt > 0.005) {
+                            carryforwardDebts[person] = remainingDebt;
+                        }
+                    }
+                });
+            }
 
             const filtered = getFilteredExpenses();
             const [year, month] = selectedMonth.split('-');
@@ -711,6 +826,10 @@
             const mainFloorUtilityTotal = utilitySharePerPerson * upstairsHousehold.length; // 5 residents' share
             const targetSharePerPerson = householdSharePerPerson + utilitySharePerPerson;
 
+            // Save carryforwards lookup helper data
+            if (!monthlyPayments.prevHouseholdCarry) monthlyPayments.prevHouseholdCarry = {};
+            monthlyPayments.prevHouseholdCarry[selectedMonth] = carryforwardDebts;
+
             // Update UI Summary Box
             document.getElementById('household-total').innerText = householdTotal.toFixed(2);
             document.getElementById('household-share').innerText = householdSharePerPerson.toFixed(2);
@@ -752,7 +871,17 @@
 
             upstairsHousehold.forEach(person => {
                 const paid = (personHouseholdSpent[person] || 0) + (personUtilitySpent[person] || 0);
-                const net = paid - targetSharePerPerson;
+                const carriedOver = carryforwardDebts[person] || 0;
+                const totalTarget = targetSharePerPerson + carriedOver;
+                const net = paid - totalTarget;
+
+                const recordVal = monthlyPayments.householdPaid?.[selectedMonth]?.[person];
+                let paidAmount = 0;
+                if (recordVal === true) {
+                    if (net < 0) paidAmount = Math.abs(net);
+                } else if (typeof recordVal === 'number') {
+                    paidAmount = recordVal;
+                }
 
                 let netClass = '';
                 let statusClass = '';
@@ -761,32 +890,62 @@
 
                 // POSITIVE OR ZERO BALANCE (>= 0)
                 if (net >= 0) {
-                    netClass = 'val-net-positive';
-                    statusClass = 'gets-back';
-                    statusText = `Gets back $${Math.abs(net).toFixed(2)}`;
-                    formattedNet = `$${Math.abs(net).toFixed(2)}`; 
-                    if (net > 0.005) {
-                        creditors.push({ person, amount: net });
+                    const remainingGet = net - paidAmount;
+                    if (remainingGet <= 0.005) {
+                        netClass = 'val-net-positive';
+                        statusClass = 'gets-back';
+                        statusText = 'Paid & Settled ✓';
+                        formattedNet = `$0.00`;
+                    } else {
+                        netClass = 'val-net-positive';
+                        statusClass = 'gets-back';
+                        statusText = paidAmount > 0 ? `Gets back remaining $${remainingGet.toFixed(2)} (Partial Paid)` : `Gets back $${net.toFixed(2)} (Unpaid)`;
+                        formattedNet = `$${remainingGet.toFixed(2)}`;
+                        creditors.push({ person, amount: remainingGet });
                     }
                 } 
                 // NEGATIVE BALANCE (< 0)
                 else {
-                    netClass = 'val-net-negative';
-                    statusClass = 'owes';
-                    statusText = `Owes $${Math.abs(net).toFixed(2)}`;
-                    formattedNet = `-$${Math.abs(net).toFixed(2)}`;
-                    if (net < -0.005) {
-                        debtors.push({ person, amount: Math.abs(net) });
+                    const totalOwed = Math.abs(net);
+                    const remainingDebt = totalOwed - paidAmount;
+                    if (remainingDebt <= 0.005) {
+                        netClass = 'val-net-positive';
+                        statusClass = 'gets-back';
+                        statusText = 'Paid & Settled ✓';
+                        formattedNet = `$0.00`;
+                    } else {
+                        netClass = 'val-net-negative';
+                        statusClass = 'owes';
+                        statusText = paidAmount > 0 ? `Owes remaining $${remainingDebt.toFixed(2)} (Partial Paid)` : (carriedOver > 0 ? `Owes $${totalOwed.toFixed(2)} (Incl. Carryforward - Unpaid)` : `Owes $${totalOwed.toFixed(2)} (Unpaid)`);
+                        formattedNet = `-$${remainingDebt.toFixed(2)}`;
+                        debtors.push({ person, amount: remainingDebt });
                     }
+                }
+
+                let actionButtonHtml = '';
+                if (isAdmin) {
+                    const isSettledCompletely = (net >= 0 ? (net - paidAmount <= 0.005) : (Math.abs(net) - paidAmount <= 0.005));
+                    actionButtonHtml = `
+                        <td>
+                            <button class="btn-action ${isSettledCompletely ? 'btn-delete' : 'btn-calc'}" onclick="promptHouseholdPayment('${selectedMonth}', '${person}', ${Math.abs(net)})">
+                                ${isSettledCompletely ? 'Unmark Paid ✓' : (paidAmount > 0 ? `Paid $${paidAmount.toFixed(2)} (Edit)` : 'Mark Paid')}
+                            </button>
+                        </td>`;
+                }
+
+                let rowSubInfo = carriedOver > 0 ? `<br><small style="color:#d35400;">Carryforward: +$${carriedOver.toFixed(2)}</small>` : '';
+                if (paidAmount > 0 && statusText.includes('Partial')) {
+                    rowSubInfo += `<br><small style="color:#e67e22;">Paid so far: $${paidAmount.toFixed(2)}</small>`;
                 }
 
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td><strong>${person}</strong></td>
+                    <td><strong>${person}</strong> ${rowSubInfo}</td>
                     <td class="val-paid">$${paid.toFixed(2)}</td>
-                    <td class="val-target">$${targetSharePerPerson.toFixed(2)}</td>
+                    <td class="val-target">$${totalTarget.toFixed(2)}</td>
                     <td class="${netClass}">${formattedNet}</td>
                     <td class="${statusClass}">${statusText}</td>
+                    ${actionButtonHtml}
                 `;
                 settlementBody.appendChild(row);
             });
