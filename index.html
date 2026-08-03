@@ -85,7 +85,11 @@
         .btn-export:hover { background-color: #117864; }
         .btn-clear { background-color: #e74c3c; float: right; }
         .btn-clear:hover { background-color: #c0392b; }
-        .btn-action { padding: 4px 8px; font-size: 12px; margin-right: 4px; }
+        .btn-action { padding: 6px 12px; font-size: 12px; margin-right: 4px; border-radius: 4px; font-weight: bold; color: white; }
+        .btn-settled { background-color: #27ae60; } /* Green for settled/paid */
+        .btn-settled:hover { background-color: #219150; }
+        .btn-unpaid { background-color: #e74c3c; } /* Red for unpaid */
+        .btn-unpaid:hover { background-color: #c0392b; }
         .btn-edit { background-color: #f39c12; }
         .btn-delete { background-color: #e74c3c; }
 
@@ -966,15 +970,26 @@
                 let actionButtonHtml = '';
                 if (isAdmin) {
                     const isSettledCompletely = (net >= 0 ? (net - paidAmount <= 0.005) : (Math.abs(net) - paidAmount <= 0.005));
+                    
+                    // Button color: Green when settled/paid, Red when unpaid
+                    const actionBtnClass = isSettledCompletely ? 'btn-action btn-settled' : 'btn-action btn-unpaid';
+                    const actionBtnLabel = isSettledCompletely ? 'Paid / Settled ✓ (Click to Reset)' : (paidAmount > 0 ? `Paid $${paidAmount.toFixed(2)} (Mark Unpaid)` : 'Unpaid (Click to Mark Paid)');
+
                     actionButtonHtml = `
                         <td>
-                            <button class="btn-action ${isSettledCompletely ? 'btn-delete' : 'btn-calc'}" onclick="promptHouseholdPayment('${selectedMonth}', '${shareUnit}', ${Math.abs(net)})">
-                                ${isSettledCompletely ? 'Unmark Paid ✓' : (paidAmount > 0 ? `Paid $${paidAmount.toFixed(2)} (Edit)` : 'Mark Paid')}
+                            <button class="${actionBtnClass}" onclick="promptHouseholdPayment('${selectedMonth}', '${shareUnit}', ${Math.abs(net)})">
+                                ${actionBtnLabel}
                             </button>
                         </td>`;
                 }
 
-                let rowSubInfo = carriedOver > 0 ? `<br><small style="color:#d35400;">Carryforward: +$${carriedOver.toFixed(2)}</small>` : '';
+                // Show carryforward breakdown ONLY when carriedOver > 0 AND the total balance/debt is NOT fully paid yet.
+                // Once everything is fully paid/settled, carryforward text is hidden.
+                const isFullySettledOrPaid = (net >= 0 ? (net - paidAmount <= 0.005) : (Math.abs(net) - paidAmount <= 0.005));
+                let rowSubInfo = '';
+                if (carriedOver > 0 && !isFullySettledOrPaid) {
+                    rowSubInfo += `<br><small style="color:#d35400;">Carryforward: +$${carriedOver.toFixed(2)}</small>`;
+                }
                 if (paidAmount > 0 && statusText.includes('Partial')) {
                     rowSubInfo += `<br><small style="color:#e67e22;">Paid so far: $${paidAmount.toFixed(2)}</small>`;
                 }
