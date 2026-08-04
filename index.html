@@ -270,7 +270,7 @@
             </div>
         </div>
 
-        <!-- Cumulative Settlement Report (Admin Only) -->
+        <!-- Cumulative Settlement Report (Admin Only & Accessible for Archived Months) -->
         <div class="card" id="report-card" style="display: none;">
             <h2 id="report-title">Settlement Report (Main Floor Household)</h2>
             
@@ -316,8 +316,8 @@
                             <th>Total Paid</th>
                             <th>Target Share</th>
                             <th>Net Balance</th>
-                            <th>Status</th>
-                            <th id="settlement-action-col" style="display: none;">Admin Action</th>
+                            <th>Status / Whom to Pay</th>
+                            <th id="settlement-action-col">Payment Action</th>
                         </tr>
                     </thead>
                     <tbody id="settlement-list">
@@ -404,7 +404,6 @@
                 document.getElementById('clear-btn').style.display = 'block';
                 document.getElementById('admin-month-filter').style.display = 'flex';
                 document.getElementById('actions-col').style.display = 'table-cell';
-                document.getElementById('settlement-action-col').style.display = 'table-cell';
             } else {
                 document.getElementById('role-badge').innerHTML = '<span class="user-badge">PERSONAL ACCOUNT</span>';
                 
@@ -452,9 +451,9 @@
                 
                 updateMonthDropdown();
                 renderExpenses();
-                if (isAdmin) {
-                    calculateSettlement();
-                }
+                
+                // Automatically display settlement report for active or archived months
+                calculateSettlement();
             } catch (err) {
                 console.error('Error fetching cloud data:', err);
                 
@@ -469,9 +468,7 @@
                     statusEl.innerText = 'Offline mode: Loaded cached local data. Retrying cloud...';
                     updateMonthDropdown();
                     renderExpenses();
-                    if (isAdmin) {
-                        calculateSettlement();
-                    }
+                    calculateSettlement();
                 } else {
                     statusEl.innerText = 'Sync failed. Retrying in 5 seconds...';
                 }
@@ -486,11 +483,8 @@
             const dropdown = document.getElementById('month-filter');
             const currentYM = getLocalMonthString();
             
-            // Filter active (non-archived) expenses for dropdown populating
-            const activeExpenses = expenses.filter(e => !e.archived);
-
-            // Extract distinct YYYY-MM entries from active expenses + current month
-            const monthSet = new Set(activeExpenses.map(e => e.date ? e.date.slice(0, 7) : ''));
+            // Collect all unique months from both active and archived expenses
+            const monthSet = new Set(expenses.map(e => e.date ? e.date.slice(0, 7) : ''));
             monthSet.add(currentYM);
             monthSet.delete('');
 
@@ -522,9 +516,7 @@
         function onMonthFilterChange() {
             selectedMonth = document.getElementById('month-filter').value;
             renderExpenses();
-            if (isAdmin && document.getElementById('report-card').style.display === 'block') {
-                calculateSettlement();
-            }
+            calculateSettlement();
         }
 
         // SAVE EXPENSES TO CLOUD
@@ -598,9 +590,7 @@
             updateMonthDropdown();
 
             renderExpenses();
-            if (isAdmin && document.getElementById('report-card').style.display === 'block') {
-                calculateSettlement();
-            }
+            calculateSettlement();
 
             await saveExpensesToCloud();
 
@@ -611,9 +601,9 @@
             submitBtn.innerText = originalText;
         });
 
-        // Filter helper: returns ONLY active (non-archived) expenses for the selected month
+        // Filter helper: returns expenses for the selected month (includes archived items when viewing past months in archive)
         function getFilteredExpenses() {
-            return expenses.filter(e => !e.archived && e.date && e.date.startsWith(selectedMonth));
+            return expenses.filter(e => e.date && e.date.startsWith(selectedMonth));
         }
 
         // Render Expenses Table (Filtered by Month & XSS Protected)
@@ -633,7 +623,7 @@
 
             if (filtered.length === 0) {
                 const colSpan = isAdmin ? 6 : 5;
-                list.innerHTML = `<tr><td colspan="${colSpan}">No active expenses recorded for ${monthLabel}.</td></tr>`;
+                list.innerHTML = `<tr><td colspan="${colSpan}">No expenses recorded for ${monthLabel}.</td></tr>`;
                 return;
             }
 
@@ -704,9 +694,7 @@
 
             renderExpenses();
             await saveExpensesToCloud();
-            if (document.getElementById('report-card').style.display === 'block') {
-                calculateSettlement();
-            }
+            calculateSettlement();
         }
 
         // Admin Action: Delete Expense
@@ -718,16 +706,12 @@
                 updateMonthDropdown();
                 renderExpenses();
                 await saveExpensesToCloud();
-                if (document.getElementById('report-card').style.display === 'block') {
-                    calculateSettlement();
-                }
+                calculateSettlement();
             }
         }
 
-        // Admin Action: Prompt & Record Partial/Full Payment
-        async function promptHouseholdPayment(month, shareUnit, fullDueAmount) {
-            if (!isAdmin) return;
-
+        // Toggle Payment Status between Paid / Unpaid (Accessible to all users for viewing, Admin/Self for updating)
+        async function togglePaymentStatus(month, shareUnit, fullDueAmount) {
             if (!monthlyPayments.householdPaid) {
                 monthlyPayments.householdPaid = {};
             }
@@ -739,34 +723,24 @@
             const isFullyPaid = (currentPaidAmount === true || currentPaidAmount >= fullDueAmount - 0.005);
 
             if (isFullyPaid) {
-                // Toggle back to unpaid / 0
+                // Toggle back to unpaid
                 monthlyPayments.householdPaid[month][shareUnit] = 0;
             } else {
-                const defaultVal = fullDueAmount > 0 ? fullDueAmount.toFixed(2) : "0.00";
-                const inputStr = prompt(`Enter payment amount received for ${shareUnit} (Total Due: $${defaultVal}):`, defaultVal);
-                if (inputStr === null) return;
-
-                const paidAmt = parseFloat(inputStr);
-                if (isNaN(paidAmt) || paidAmt < 0) {
-                    alert("Please enter a valid payment amount.");
-                    return;
-                }
-                monthlyPayments.householdPaid[month][shareUnit] = paidAmt;
+                // Mark as fully paid
+                monthlyPayments.householdPaid[month][shareUnit] = fullDueAmount > 0 ? fullDueAmount : true;
             }
 
             calculateSettlement();
             await saveExpensesToCloud();
         }
 
-        // Admin Action: Calculate Settlement & Spending Summary for Selected Month
+        // Calculate Settlement & Spending Summary for Selected Month
         function calculateSettlement() {
-            if (!isAdmin) return;
-
             const prevMonth = getPreviousMonthString(selectedMonth);
             let carryforwardDebts = {};
 
             // 1. Calculate Carryforwards from Previous Month
-            const prevExpenses = expenses.filter(e => !e.archived && e.date && e.date.startsWith(prevMonth));
+            const prevExpenses = expenses.filter(e => e.date && e.date.startsWith(prevMonth));
             if (prevExpenses.length > 0) {
                 let prevHouseholdTotal = 0;
                 let prevShawTotal = 0, prevEnmaxTotal = 0, prevAtcoTotal = 0;
@@ -785,10 +759,8 @@
                     }
                 });
 
-                const prevHouseholdSharePerUnit = prevHouseholdTotal / 5; // 5 shares total (Jigneshkumar=1, J&I=2, V&D=2)
+                const prevHouseholdSharePerUnit = prevHouseholdTotal / 5; 
                 const prevUtilitySharePerResident = ((prevShawTotal + prevEnmaxTotal + prevAtcoTotal) / TOTAL_UTILITY_RESIDENTS);
-                
-                // Utility multipliers per share unit (Jignesh=1 resident, J&I=2 residents, V&D=2 residents)
                 const residentCountMap = { "Jigneshkumar": 1, "Jaimin & Ishani": 2, "Viru & Drashti": 2 };
 
                 upstairsShares.forEach(shareUnit => {
@@ -821,7 +793,10 @@
             const [year, month] = selectedMonth.split('-');
             const monthLabel = new Date(year, month - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
 
-            document.getElementById('report-title').innerText = `Settlement Report (${monthLabel})`;
+            const currentYM = getLocalMonthString();
+            document.getElementById('report-title').innerText = selectedMonth === currentYM 
+                ? `Settlement Report (${monthLabel} - Active)` 
+                : `Settlement Report (${monthLabel} - Previous Month / Archived Standing)`;
 
             let householdTotal = 0;
             let shawTotal = 0;
@@ -854,11 +829,7 @@
                 }
             });
 
-            // Calculate per 1-way household rate unit ($ / share)
-            // Total household shares = 1 (Jigneshkumar) + 2 (Jaimin & Ishani) + 2 (Viru & Drashti) = 5 shares
             const baseHouseholdShareAmount = householdTotal / 5; 
-            
-            // Utilities are split per individual resident (9 total residents)
             const shawSharePerResident = shawTotal / TOTAL_UTILITY_RESIDENTS;         
             const enmaxSharePerResident = enmaxTotal / TOTAL_UTILITY_RESIDENTS;       
             const atcoSharePerResident = atcoTotal / TOTAL_UTILITY_RESIDENTS;         
@@ -866,26 +837,20 @@
 
             const residentCountMap = { "Jigneshkumar": 1, "Jaimin & Ishani": 2, "Viru & Drashti": 2 };
             const householdShareWeightMap = { "Jigneshkumar": 1, "Jaimin & Ishani": 2, "Viru & Drashti": 2 };
+            const mainFloorUtilityTotal = utilitySharePerResident * 5; 
 
-            const mainFloorUtilityTotal = utilitySharePerResident * 5; // 5 main floor residents combined
-
-            // Save carryforwards lookup helper data
             if (!monthlyPayments.prevHouseholdCarry) monthlyPayments.prevHouseholdCarry = {};
             monthlyPayments.prevHouseholdCarry[selectedMonth] = carryforwardDebts;
 
             // Update UI Summary Box
             document.getElementById('household-total').innerText = householdTotal.toFixed(2);
             document.getElementById('household-share').innerText = baseHouseholdShareAmount.toFixed(2);
-            
             document.getElementById('shaw-total').innerText = shawTotal.toFixed(2);
             document.getElementById('shaw-share').innerText = shawSharePerResident.toFixed(2);
-
             document.getElementById('enmax-total').innerText = enmaxTotal.toFixed(2);
             document.getElementById('enmax-share').innerText = enmaxSharePerResident.toFixed(2);
-
             document.getElementById('atco-total').innerText = atcoTotal.toFixed(2);
             document.getElementById('atco-share').innerText = atcoSharePerResident.toFixed(2);
-
             document.getElementById('utility-total').innerText = mainFloorUtilityTotal.toFixed(2);
 
             // Populate Spending Breakdown Table
@@ -908,6 +873,70 @@
             let debtors = [];
             let creditors = [];
 
+            // Pre-calculate debtors and creditors for whom-to-pay instructions
+            upstairsShares.forEach(shareUnit => {
+                const paid = (shareHouseholdSpent[shareUnit] || 0) + (shareUtilitySpent[shareUnit] || 0);
+                const carriedOver = carryforwardDebts[shareUnit] || 0;
+                const hTarget = baseHouseholdShareAmount * householdShareWeightMap[shareUnit];
+                const uTarget = utilitySharePerResident * residentCountMap[shareUnit];
+                const totalTarget = hTarget + uTarget + carriedOver;
+                const net = paid - totalTarget;
+
+                const recordVal = monthlyPayments.householdPaid?.[selectedMonth]?.[shareUnit];
+                let paidAmount = 0;
+                if (recordVal === true) {
+                    if (net < 0) paidAmount = Math.abs(net);
+                    else if (net > 0) paidAmount = net;
+                } else if (typeof recordVal === 'number') {
+                    paidAmount = recordVal;
+                }
+
+                if (net >= 0) {
+                    const remainingGet = net - paidAmount;
+                    if (remainingGet > 0.005) creditors.push({ person: shareUnit, amount: remainingGet });
+                } else {
+                    const totalOwed = Math.abs(net);
+                    const remainingDebt = totalOwed - paidAmount;
+                    if (remainingDebt > 0.005) debtors.push({ person: shareUnit, amount: remainingDebt });
+                }
+            });
+
+            // Populate Direct Transfers List
+            const transfersList = document.getElementById('transfers-list');
+            transfersList.innerHTML = '';
+
+            let transferSteps = [];
+            if (debtors.length > 0 && creditors.length > 0) {
+                let dIndex = 0, cIndex = 0;
+                let tempDebtors = JSON.parse(JSON.stringify(debtors));
+                let tempCreditors = JSON.parse(JSON.stringify(creditors));
+
+                while (dIndex < tempDebtors.length && cIndex < tempCreditors.length) {
+                    let debtor = tempDebtors[dIndex];
+                    let creditor = tempCreditors[cIndex];
+                    let transferAmount = Math.min(debtor.amount, creditor.amount);
+
+                    transferSteps.push(`<strong>${debtor.person}</strong> pays <strong>${creditor.person}</strong>: <span style="color:#27ae60; font-weight:bold;">$${transferAmount.toFixed(2)}</span>`);
+
+                    debtor.amount -= transferAmount;
+                    creditor.amount -= transferAmount;
+
+                    if (debtor.amount < 0.01) dIndex++;
+                    if (creditor.amount < 0.01) cIndex++;
+                }
+            }
+
+            if (transferSteps.length === 0) {
+                transfersList.innerHTML = '<li>All direct transfers are fully settled for this month! ✓</li>';
+            } else {
+                transferSteps.forEach(step => {
+                    const li = document.createElement('li');
+                    li.innerHTML = step;
+                    transfersList.appendChild(li);
+                });
+            }
+
+            // Populate Share Units Balances & Settlement Table
             const settlementBody = document.getElementById('settlement-list');
             settlementBody.innerHTML = '';
 
@@ -933,7 +962,6 @@
                 let statusText = '';
                 let formattedNet = '';
 
-                // POSITIVE OR ZERO BALANCE (>= 0)
                 if (net >= 0) {
                     const remainingGet = net - paidAmount;
                     if (remainingGet <= 0.005) {
@@ -944,13 +972,10 @@
                     } else {
                         netClass = 'val-net-positive';
                         statusClass = 'gets-back';
-                        statusText = paidAmount > 0 ? `Gets back remaining $${remainingGet.toFixed(2)} (Partial Paid)` : `Gets back $${net.toFixed(2)} (Unpaid)`;
+                        statusText = `Gets back $${remainingGet.toFixed(2)}`;
                         formattedNet = `$${remainingGet.toFixed(2)}`;
-                        creditors.push({ person: shareUnit, amount: remainingGet });
                     }
-                } 
-                // NEGATIVE BALANCE (< 0)
-                else {
+                } else {
                     const totalOwed = Math.abs(net);
                     const remainingDebt = totalOwed - paidAmount;
                     if (remainingDebt <= 0.005) {
@@ -961,36 +986,37 @@
                     } else {
                         netClass = 'val-net-negative';
                         statusClass = 'owes';
-                        statusText = paidAmount > 0 ? `Owes remaining $${remainingDebt.toFixed(2)} (Partial Paid)` : (carriedOver > 0 ? `Owes $${totalOwed.toFixed(2)} (Incl. Carryforward - Unpaid)` : `Owes $${totalOwed.toFixed(2)} (Unpaid)`);
+                        statusText = paidAmount > 0 ? `Owes remaining $${remainingDebt.toFixed(2)}` : `Owes $${totalOwed.toFixed(2)}`;
                         formattedNet = `-$${remainingDebt.toFixed(2)}`;
-                        debtors.push({ person: shareUnit, amount: remainingDebt });
                     }
                 }
 
-                let actionButtonHtml = '';
-                if (isAdmin) {
-                    const isSettledCompletely = (net >= 0 ? (net - paidAmount <= 0.005) : (Math.abs(net) - paidAmount <= 0.005));
-                    
-                    // Button color: Green when settled/paid, Red when unpaid
-                    const actionBtnClass = isSettledCompletely ? 'btn-action btn-settled' : 'btn-action btn-unpaid';
-                    const actionBtnLabel = isSettledCompletely ? 'Paid / Settled ✓ (Click to Reset)' : (paidAmount > 0 ? `Paid $${paidAmount.toFixed(2)} (Mark Unpaid)` : 'Unpaid (Click to Mark Paid)');
+                // Check if user is allowed to toggle payment status (Admin or the respective user)
+                const isUserThemSelf = (currentUserShare === shareUnit);
+                const canTogglePayment = isAdmin || isUserThemSelf;
 
+                let actionButtonHtml = '';
+                const isFullySettledOrPaid = (net >= 0 ? (net - paidAmount <= 0.005) : (Math.abs(net) - paidAmount <= 0.005));
+                
+                const actionBtnClass = isFullySettledOrPaid ? 'btn-action btn-settled' : 'btn-action btn-unpaid';
+                const actionBtnLabel = isFullySettledOrPaid ? 'Paid / Settled ✓ (Click to Undo)' : 'Mark as Paid';
+
+                if (canTogglePayment) {
                     actionButtonHtml = `
                         <td>
-                            <button class="${actionBtnClass}" onclick="promptHouseholdPayment('${selectedMonth}', '${shareUnit}', ${Math.abs(net)})">
+                            <button class="${actionBtnClass}" onclick="togglePaymentStatus('${selectedMonth}', '${shareUnit}', ${Math.abs(net)})">
                                 ${actionBtnLabel}
                             </button>
                         </td>`;
+                } else {
+                    actionButtonHtml = `<td><span class="badge ${isFullySettledOrPaid ? 'bg-success' : 'bg-secondary'}">${isFullySettledOrPaid ? 'Settled' : 'Unpaid'}</span></td>`;
                 }
 
-                // Show carryforward breakdown ONLY when carriedOver > 0 AND the total balance/debt is NOT fully paid yet.
-                // Once everything is fully paid/settled, carryforward text is hidden.
-                const isFullySettledOrPaid = (net >= 0 ? (net - paidAmount <= 0.005) : (Math.abs(net) - paidAmount <= 0.005));
                 let rowSubInfo = '';
                 if (carriedOver > 0 && !isFullySettledOrPaid) {
                     rowSubInfo += `<br><small style="color:#d35400;">Carryforward: +$${carriedOver.toFixed(2)}</small>`;
                 }
-                if (paidAmount > 0 && statusText.includes('Partial')) {
+                if (paidAmount > 0 && !isFullySettledOrPaid) {
                     rowSubInfo += `<br><small style="color:#e67e22;">Paid so far: $${paidAmount.toFixed(2)}</small>`;
                 }
 
@@ -1006,31 +1032,6 @@
                 settlementBody.appendChild(row);
             });
 
-            const transfersList = document.getElementById('transfers-list');
-            transfersList.innerHTML = '';
-
-            if (debtors.length === 0 && creditors.length === 0) {
-                transfersList.innerHTML = '<li>Everyone is settled up equally for this month!</li>';
-            } else {
-                let dIndex = 0, cIndex = 0;
-                while (dIndex < debtors.length && cIndex < creditors.length) {
-                    let debtor = debtors[dIndex];
-                    let creditor = creditors[cIndex];
-
-                    let transferAmount = Math.min(debtor.amount, creditor.amount);
-
-                    const li = document.createElement('li');
-                    li.innerHTML = `<strong>${debtor.person}</strong> owes <strong>${creditor.person}</strong>: <span style="color:#27ae60; font-weight:bold;">$${transferAmount.toFixed(2)}</span>`;
-                    transfersList.appendChild(li);
-
-                    debtor.amount -= transferAmount;
-                    creditor.amount -= transferAmount;
-
-                    if (debtor.amount < 0.01) dIndex++;
-                    if (creditor.amount < 0.01) cIndex++;
-                }
-            }
-
             document.getElementById('report-card').style.display = 'block';
         }
 
@@ -1039,14 +1040,12 @@
             const filtered = getFilteredExpenses();
 
             if (filtered.length === 0) {
-                alert('No active expenses recorded for this month to export.');
+                alert('No expenses recorded for this month to export.');
                 return;
             }
 
-            // Standard Header Row
             let csvContent = "Date,Paid By,Category,Description,Amount\n";
 
-            // Process Each Row Safely
             filtered.forEach(e => {
                 const formattedPaidBy = e.paidBy ? e.paidBy.charAt(0).toUpperCase() + e.paidBy.slice(1) : '';
                 const escapedDesc = e.description ? `"${e.description.replace(/"/g, '""')}"` : '""';
@@ -1054,7 +1053,6 @@
                 csvContent += row + "\n";
             });
 
-            // \uFEFF (UTF-8 BOM) ensures Mobile Excel / Numbers / Google Sheets parse formatting correctly
             const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
 
@@ -1065,7 +1063,6 @@
             
             link.click();
 
-            // Clean up DOM and memory
             document.body.removeChild(link);
             setTimeout(() => URL.revokeObjectURL(url), 100);
         }
@@ -1077,21 +1074,20 @@
             const [year, month] = selectedMonth.split('-');
             const monthLabel = new Date(year, month - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
 
-            const activeMonthExpenses = expenses.filter(e => !e.archived && e.date && e.date.startsWith(selectedMonth));
+            const monthExpenses = expenses.filter(e => e.date && e.date.startsWith(selectedMonth));
 
-            if (activeMonthExpenses.length === 0) {
-                alert(`No active expenses recorded for ${monthLabel} to archive.`);
+            if (monthExpenses.length === 0) {
+                alert(`No expenses recorded for ${monthLabel} to archive.`);
                 return;
             }
 
             const confirmed = confirm(
-                `Archive ${activeMonthExpenses.length} expense(s) for ${monthLabel}?\n\n` +
-                `This will hide them from calculations and logs, but they will remain safely stored in the cloud database.`
+                `Archive month ${monthLabel}?\n\n` +
+                `This will lock the records into archive mode where past standings and settlements remain fully reviewable.`
             );
 
             if (!confirmed) return;
 
-            // Mark expenses for the selected month as archived
             expenses.forEach(e => {
                 if (e.date && e.date.startsWith(selectedMonth)) {
                     e.archived = true;
@@ -1101,7 +1097,7 @@
             await saveExpensesToCloud();
             updateMonthDropdown();
             renderExpenses();
-            document.getElementById('report-card').style.display = 'none';
+            calculateSettlement();
         }
     </script>
 </body>
