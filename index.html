@@ -625,34 +625,12 @@
                 }
             }
 
-            // COMBINED AMOUNT LOGIC FOR COUPLES (Viru & Drashti):
-            // If the user profile is Viru or Drashti, display combined amount they owe to Jaimin (or respective creditor) instead of individual.
-            let displayNetValue = net;
-            let displayPaidAmount = paidAmount;
-            let displayRemainingDebt = 0;
-            let displayRemainingGet = 0;
-
-            if (userShareUnit === "Viru & Drashti") {
-                // Viru handles payment for both Viru & Drashti. Show combined standing.
-                if (net >= 0) {
-                    displayRemainingGet = net - paidAmount;
-                } else {
-                    displayRemainingDebt = Math.abs(net) - paidAmount;
-                }
-            } else if (userShareUnit === "Jaimin & Ishani") {
-                if (net >= 0) {
-                    displayRemainingGet = net - paidAmount;
-                } else {
-                    displayRemainingDebt = Math.abs(net) - paidAmount;
-                }
-            }
-
             if (net >= 0) {
                 const remainingGet = net - paidAmount;
                 if (remainingGet <= 0.005) {
                     messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: You are fully settled up for last month! ✓`;
                 } else {
-                    messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: You get back a net balance of <span class="gets-back">+$${remainingGet.toFixed(2)}</span>.`;
+                    messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: Your combined share gets back a net balance of <span class="gets-back">+$${remainingGet.toFixed(2)}</span>.`;
                 }
             } else {
                 const totalOwed = Math.abs(net);
@@ -660,18 +638,17 @@
                 if (remainingDebt <= 0.005) {
                     messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: Your previous month's balance is fully settled ✓.`;
                 } else {
-                    // Check if Viru & Drashti owe to Jaimin & Ishani specifically
                     let owesToName = specificOwesTo;
                     if (userShareUnit === "Viru & Drashti" && specificOwesTo === "Jaimin & Ishani") {
-                        owesToName = "Jaimin"; // As requested: "Viru & Drashti banner will show combined amount in both user profile that is still owes to jaimin"
+                        owesToName = "Jaimin"; 
                     }
 
                     if (owesToName) {
-                        messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: As a couple, the combined amount still owed to ${owesToName} is <span class="owes">-$${remainingDebt.toFixed(2)}</span>.`;
+                        messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: Your combined share owes to ${owesToName}: <span class="owes">-$${remainingDebt.toFixed(2)}</span>.`;
                     } else if (specificOwesTo) {
-                        messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong> Owed to ${specificOwesTo}: You have an outstanding balance of <span class="owes">-$${remainingDebt.toFixed(2)}</span>.`;
+                        messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: Your combined share owes to ${specificOwesTo}: <span class="owes">-$${remainingDebt.toFixed(2)}</span>.`;
                     } else {
-                        messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: You have an outstanding balance / owe <span class="owes">-$${remainingDebt.toFixed(2)}</span> from last month.`;
+                        messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: Your combined share has an outstanding balance / owes <span class="owes">-$${remainingDebt.toFixed(2)}</span> from last month.`;
                     }
                 }
             }
@@ -720,7 +697,6 @@
             selectedMonth = document.getElementById('month-filter').value;
             renderExpenses();
             
-            // For admin, changing month hides report until they click Calculate Settlement. For non-admin, auto show if ended.
             if (isMonthEnded(selectedMonth) && !isAdmin) {
                 calculateSettlement();
             } else {
@@ -1117,7 +1093,6 @@
                     let creditor = tempCreditors[cIndex];
                     let transferAmount = Math.min(debtor.amount, creditor.amount);
 
-                    // If Viru & Drashti pay Jaimin & Ishani, show "Jaimin" as requested
                     let creditorDisplayName = creditor.person;
                     if (creditor.person === "Jaimin & Ishani") creditorDisplayName = "Jaimin";
 
