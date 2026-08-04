@@ -86,12 +86,34 @@
         .btn-clear { background-color: #e74c3c; float: right; }
         .btn-clear:hover { background-color: #c0392b; }
         .btn-action { padding: 6px 12px; font-size: 12px; margin-right: 4px; border-radius: 4px; font-weight: bold; color: white; }
-        .btn-settled { background-color: #27ae60; } /* Green for settled/paid */
+        .btn-settled { background-color: #27ae60; }
         .btn-settled:hover { background-color: #219150; }
-        .btn-unpaid { background-color: #e74c3c; } /* Red for unpaid */
+        .btn-unpaid { background-color: #e74c3c; }
         .btn-unpaid:hover { background-color: #c0392b; }
         .btn-edit { background-color: #f39c12; }
         .btn-delete { background-color: #e74c3c; }
+
+        /* Previous Month Summary Banner */
+        .prev-month-banner {
+            background: #eef7fe;
+            border-left: 5px solid #2980b9;
+            padding: 15px 20px;
+            border-radius: 0 6px 6px 0;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .prev-month-banner h3 {
+            margin-top: 0;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .prev-month-banner p {
+            margin: 5px 0 0 0;
+            font-size: 15px;
+            line-height: 1.5;
+        }
 
         /* Responsive Table Formatting */
         .table-responsive {
@@ -213,6 +235,9 @@
             <div id="role-badge"></div>
         </div>
 
+        <!-- Previous Month Summary Banner (Displayed on Login) -->
+        <div id="prev-month-summary-container"></div>
+
         <h1>253 Herron Mews Main Floor Household Expense Tracker</h1>
 
         <!-- Add Expense Form -->
@@ -222,7 +247,6 @@
                 <input type="date" id="date" required>
                 <select id="category" required>
                     <option value="household" selected>General Household (5-Way Individual Split)</option>
-                    <!-- Admin Only Utility Options (Full bill entered, split 9 ways) -->
                     <option value="shaw" class="admin-option">Shaw Internet (Split 9 Ways)</option>
                     <option value="enmax" class="admin-option">Enmax Electricity (Split 9 Ways)</option>
                     <option value="atco" class="admin-option">Atco Gas (Split 9 Ways)</option>
@@ -457,6 +481,7 @@
                 
                 updateMonthDropdown();
                 renderExpenses();
+                renderPreviousMonthSummary();
                 
                 // Only display settlement report if viewing an ended/archived month
                 if (isMonthEnded(selectedMonth)) {
@@ -478,6 +503,7 @@
                     statusEl.innerText = 'Offline mode: Loaded cached local data. Retrying cloud...';
                     updateMonthDropdown();
                     renderExpenses();
+                    renderPreviousMonthSummary();
                     if (isMonthEnded(selectedMonth)) {
                         calculateSettlement();
                     } else {
@@ -492,17 +518,97 @@
             }
         }
 
+        // RENDER PREVIOUS MONTH STANDING SUMMARY ON LOGIN
+        function renderPreviousMonthSummary() {
+            const container = document.getElementById('prev-month-summary-container');
+            container.innerHTML = '';
+
+            const currentYM = getLocalMonthString();
+            const prevMonthYM = getPreviousMonthString(currentYM);
+            const [pYear, pMonth] = prevMonthYM.split('-');
+            const prevMonthLabel = new Date(pYear, pMonth - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+
+            // Calculate previous month standing for the logged-in user's share unit
+            const prevExpenses = expenses.filter(e => e.date && e.date.startsWith(prevMonthYM));
+            
+            if (prevExpenses.length === 0) {
+                // If no records for previous month, don't show the banner or show a clean notice
+                return;
+            }
+
+            let prevHouseholdTotal = 0;
+            let prevShawTotal = 0, prevEnmaxTotal = 0, prevAtcoTotal = 0;
+            const prevShareSpent = {};
+            upstairsShares.forEach(s => prevShareSpent[s] = 0);
+
+            prevExpenses.forEach(item => {
+                if (item.category === 'shaw') prevShawTotal += item.amount;
+                else if (item.category === 'enmax') prevEnmaxTotal += item.amount;
+                else if (item.category === 'atco') prevAtcoTotal += item.amount;
+                else {
+                    prevHouseholdTotal += item.amount;
+                    const key = (item.paidBy || '').toLowerCase().trim();
+                    const shareUnit = userToShareMap[key] || "Jigneshkumar";
+                    if (prevShareSpent[shareUnit] !== undefined) prevShareSpent[shareUnit] += item.amount;
+                }
+            });
+
+            const prevHouseholdSharePerUnit = prevHouseholdTotal / 5; 
+            const prevUtilitySharePerResident = ((prevShawTotal + prevEnmaxTotal + prevAtcoTotal) / TOTAL_UTILITY_RESIDENTS);
+            const residentCountMap = { "Jigneshkumar": 1, "Jaimin & Ishani": 2, "Viru & Drashti": 2 };
+            const householdShareWeightMap = { "Jigneshkumar": 1, "Jaimin & Ishani": 2, "Viru & Drashti": 2 };
+
+            const userShareUnit = currentUserShare;
+            const paid = prevShareSpent[userShareUnit] || 0;
+            const hTarget = prevHouseholdSharePerUnit * householdShareWeightMap[userShareUnit];
+            const uTarget = prevUtilitySharePerResident * residentCountMap[userShareUnit];
+            const totalTarget = hTarget + uTarget;
+            const net = paid - totalTarget;
+
+            const recordVal = monthlyPayments.householdPaid?.[prevMonthYM]?.[userShareUnit];
+            let paidAmount = 0;
+            if (recordVal === true) {
+                if (net < 0) paidAmount = Math.abs(net);
+                else if (net > 0) paidAmount = net;
+            } else if (typeof recordVal === 'number') {
+                paidAmount = recordVal;
+            }
+
+            let messageHtml = '';
+            if (net >= 0) {
+                const remainingGet = net - paidAmount;
+                if (remainingGet <= 0.005) {
+                    messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: You are fully settled up for last month! ✓`;
+                } else {
+                    messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: You get back a net balance of <span class="gets-back">+$${remainingGet.toFixed(2)}</span>.`;
+                }
+            } else {
+                const totalOwed = Math.abs(net);
+                const remainingDebt = totalOwed - paidAmount;
+                if (remainingDebt <= 0.005) {
+                    messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: Your previous month's balance is fully settled ✓.`;
+                } else {
+                    messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: You have an outstanding balance / owe <span class="owes">-$${remainingDebt.toFixed(2)}</span> from last month.`;
+                }
+            }
+
+            container.innerHTML = `
+                <div class="prev-month-banner">
+                    <h3>My Summary Previous Month (${prevMonthLabel} Standing)</h3>
+                    <p>${messageHtml}</p>
+                </div>
+            `;
+        }
+
         // DYNAMICALLY GENERATE MONTH DROPDOWN WITH ACTIVE/ARCHIVED LABELS
         function updateMonthDropdown() {
             const dropdown = document.getElementById('month-filter');
             const currentYM = getLocalMonthString();
             
-            // Collect all unique months from both active and archived expenses
             const monthSet = new Set(expenses.map(e => e.date ? e.date.slice(0, 7) : ''));
             monthSet.add(currentYM);
             monthSet.delete('');
 
-            // Sort descending (latest month first)
             const sortedMonths = Array.from(monthSet).sort().reverse();
 
             dropdown.innerHTML = '';
@@ -518,7 +624,6 @@
                 dropdown.appendChild(option);
             });
 
-            // Keep user selection if valid, else default to current month
             if (sortedMonths.includes(selectedMonth)) {
                 dropdown.value = selectedMonth;
             } else {
@@ -531,7 +636,6 @@
             selectedMonth = document.getElementById('month-filter').value;
             renderExpenses();
             
-            // Respect month-end rule: only calculate/display report if the month has ended
             if (isMonthEnded(selectedMonth)) {
                 calculateSettlement();
             } else {
@@ -544,7 +648,6 @@
             const statusEl = document.getElementById('sync-status');
             statusEl.innerText = 'Saving to cloud...';
 
-            // Always cache locally first
             localStorage.setItem('cached_expenses_mainfloor', JSON.stringify(expenses));
             localStorage.setItem('cached_payments_mainfloor', JSON.stringify(monthlyPayments));
 
@@ -584,7 +687,6 @@
             const description = document.getElementById('description').value.trim();
             const amount = parseFloat(document.getElementById('amount').value);
 
-            // Input Validation Checks
             if (!description) {
                 alert('Please enter a description for the expense.');
                 return;
@@ -598,14 +700,12 @@
                 category = 'household';
             }
 
-            // Disable submit button & show feedback during request
             submitBtn.disabled = true;
             submitBtn.innerText = 'Saving Expense...';
 
             const newExpenseMonth = date.slice(0, 7);
             expenses.push({ id: Date.now(), date, category, paidBy: rawUser, description, amount, archived: false });
             
-            // Switch dropdown view to match the newly added entry's month
             selectedMonth = newExpenseMonth;
             updateMonthDropdown();
 
@@ -626,7 +726,6 @@
             submitBtn.innerText = originalText;
         });
 
-        // Filter helper: returns expenses for the selected month (includes archived items when viewing past months in archive)
         function getFilteredExpenses() {
             return expenses.filter(e => e.date && e.date.startsWith(selectedMonth));
         }
@@ -672,7 +771,6 @@
                 if (item.category === 'enmax') categoryTag = '<span style="color:#f39c12; font-weight:bold;">Enmax Elec (9-Way)</span>';
                 if (item.category === 'atco') categoryTag = '<span style="color:#e74c3c; font-weight:bold;">Atco Gas (9-Way)</span>';
 
-                // Display original entered name capitalized nicely
                 const formattedPaidBy = item.paidBy ? item.paidBy.charAt(0).toUpperCase() + item.paidBy.slice(1) : '';
 
                 row.innerHTML = `
@@ -684,13 +782,11 @@
                     ${actionsCell}
                 `;
 
-                // Safe text assignment to prevent XSS vulnerability
                 row.querySelector('.desc-cell').textContent = item.description;
                 list.appendChild(row);
             });
         }
 
-        // Admin Action: Edit Expense
         async function editExpense(id) {
             if (!isAdmin) return;
 
@@ -724,7 +820,6 @@
             }
         }
 
-        // Admin Action: Delete Expense
         async function deleteExpense(id) {
             if (!isAdmin) return;
 
@@ -741,7 +836,6 @@
             }
         }
 
-        // Toggle Payment Status between Paid / Unpaid (Accessible to all users for viewing, Admin/Self for updating)
         async function togglePaymentStatus(month, shareUnit, fullDueAmount) {
             if (!monthlyPayments.householdPaid) {
                 monthlyPayments.householdPaid = {};
@@ -754,10 +848,8 @@
             const isFullyPaid = (currentPaidAmount === true || currentPaidAmount >= fullDueAmount - 0.005);
 
             if (isFullyPaid) {
-                // Toggle back to unpaid
                 monthlyPayments.householdPaid[month][shareUnit] = 0;
             } else {
-                // Mark as fully paid
                 monthlyPayments.householdPaid[month][shareUnit] = fullDueAmount > 0 ? fullDueAmount : true;
             }
 
@@ -765,9 +857,7 @@
             await saveExpensesToCloud();
         }
 
-        // Calculate Settlement & Spending Summary for Selected Month
         function calculateSettlement() {
-            // Guard: Do not calculate or display settlement report for active months
             if (!isMonthEnded(selectedMonth)) {
                 document.getElementById('report-card').style.display = 'none';
                 return;
@@ -776,7 +866,6 @@
             const prevMonth = getPreviousMonthString(selectedMonth);
             let carryforwardDebts = {};
 
-            // 1. Calculate Carryforwards from Previous Month
             const prevExpenses = expenses.filter(e => e.date && e.date.startsWith(prevMonth));
             if (prevExpenses.length > 0) {
                 let prevHouseholdTotal = 0;
@@ -876,7 +965,6 @@
             if (!monthlyPayments.prevHouseholdCarry) monthlyPayments.prevHouseholdCarry = {};
             monthlyPayments.prevHouseholdCarry[selectedMonth] = carryforwardDebts;
 
-            // Update UI Summary Box
             document.getElementById('household-total').innerText = householdTotal.toFixed(2);
             document.getElementById('household-share').innerText = baseHouseholdShareAmount.toFixed(2);
             document.getElementById('shaw-total').innerText = shawTotal.toFixed(2);
@@ -887,7 +975,6 @@
             document.getElementById('atco-share').innerText = atcoSharePerResident.toFixed(2);
             document.getElementById('utility-total').innerText = mainFloorUtilityTotal.toFixed(2);
 
-            // Populate Spending Breakdown Table
             const spendingBody = document.getElementById('spending-breakdown-list');
             spendingBody.innerHTML = '';
 
@@ -907,7 +994,6 @@
             let debtors = [];
             let creditors = [];
 
-            // Pre-calculate debtors and creditors for whom-to-pay instructions
             upstairsShares.forEach(shareUnit => {
                 const paid = (shareHouseholdSpent[shareUnit] || 0) + (shareUtilitySpent[shareUnit] || 0);
                 const carriedOver = carryforwardDebts[shareUnit] || 0;
@@ -935,7 +1021,6 @@
                 }
             });
 
-            // Populate Direct Transfers List
             const transfersList = document.getElementById('transfers-list');
             transfersList.innerHTML = '';
 
@@ -970,7 +1055,6 @@
                 });
             }
 
-            // Populate Share Units Balances & Settlement Table
             const settlementBody = document.getElementById('settlement-list');
             settlementBody.innerHTML = '';
 
@@ -1025,7 +1109,6 @@
                     }
                 }
 
-                // Check if user is allowed to toggle payment status (Admin or the respective user)
                 const isUserThemSelf = (currentUserShare === shareUnit);
                 const canTogglePayment = isAdmin || isUserThemSelf;
 
@@ -1069,7 +1152,6 @@
             document.getElementById('report-card').style.display = 'block';
         }
 
-        // Mobile-Optimized UTF-8 Blob CSV Export Feature
         function exportToCSV() {
             const filtered = getFilteredExpenses();
 
@@ -1101,7 +1183,6 @@
             setTimeout(() => URL.revokeObjectURL(url), 100);
         }
 
-        // Admin Action: Soft Delete / Archive Selected Month's Data
         async function clearAllData() {
             if (!isAdmin) return;
 
