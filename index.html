@@ -294,7 +294,7 @@
             </div>
         </div>
 
-        <!-- Cumulative Settlement Report (Hidden for active current month until month end) -->
+        <!-- Cumulative Settlement Report (Hidden for active current month until month end or explicitly calculated) -->
         <div class="card" id="report-card" style="display: none;">
             <h2 id="report-title">Settlement Report (Main Floor Household)</h2>
             
@@ -483,8 +483,8 @@
                 renderExpenses();
                 renderPreviousMonthSummary();
                 
-                // Only display settlement report if viewing an ended/archived month
-                if (isMonthEnded(selectedMonth)) {
+                // Only display settlement report automatically if viewing an ended/archived month AND user is NOT an admin
+                if (isMonthEnded(selectedMonth) && !isAdmin) {
                     calculateSettlement();
                 } else {
                     document.getElementById('report-card').style.display = 'none';
@@ -504,7 +504,7 @@
                     updateMonthDropdown();
                     renderExpenses();
                     renderPreviousMonthSummary();
-                    if (isMonthEnded(selectedMonth)) {
+                    if (isMonthEnded(selectedMonth) && !isAdmin) {
                         calculateSettlement();
                     } else {
                         document.getElementById('report-card').style.display = 'none';
@@ -625,6 +625,28 @@
                 }
             }
 
+            // COMBINED AMOUNT LOGIC FOR COUPLES (Viru & Drashti):
+            // If the user profile is Viru or Drashti, display combined amount they owe to Jaimin (or respective creditor) instead of individual.
+            let displayNetValue = net;
+            let displayPaidAmount = paidAmount;
+            let displayRemainingDebt = 0;
+            let displayRemainingGet = 0;
+
+            if (userShareUnit === "Viru & Drashti") {
+                // Viru handles payment for both Viru & Drashti. Show combined standing.
+                if (net >= 0) {
+                    displayRemainingGet = net - paidAmount;
+                } else {
+                    displayRemainingDebt = Math.abs(net) - paidAmount;
+                }
+            } else if (userShareUnit === "Jaimin & Ishani") {
+                if (net >= 0) {
+                    displayRemainingGet = net - paidAmount;
+                } else {
+                    displayRemainingDebt = Math.abs(net) - paidAmount;
+                }
+            }
+
             if (net >= 0) {
                 const remainingGet = net - paidAmount;
                 if (remainingGet <= 0.005) {
@@ -638,8 +660,16 @@
                 if (remainingDebt <= 0.005) {
                     messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: Your previous month's balance is fully settled ✓.`;
                 } else {
-                    if (specificOwesTo) {
-                        messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong> Owed to ${specificOwesTo}: You get back a net balance of <span class="owes">-$${remainingDebt.toFixed(2)}</span> (Owes <span class="owes">$${remainingDebt.toFixed(2)}</span>).`;
+                    // Check if Viru & Drashti owe to Jaimin & Ishani specifically
+                    let owesToName = specificOwesTo;
+                    if (userShareUnit === "Viru & Drashti" && specificOwesTo === "Jaimin & Ishani") {
+                        owesToName = "Jaimin"; // As requested: "Viru & Drashti banner will show combined amount in both user profile that is still owes to jaimin"
+                    }
+
+                    if (owesToName) {
+                        messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: As a couple, the combined amount still owed to ${owesToName} is <span class="owes">-$${remainingDebt.toFixed(2)}</span>.`;
+                    } else if (specificOwesTo) {
+                        messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong> Owed to ${specificOwesTo}: You have an outstanding balance of <span class="owes">-$${remainingDebt.toFixed(2)}</span>.`;
                     } else {
                         messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: You have an outstanding balance / owe <span class="owes">-$${remainingDebt.toFixed(2)}</span> from last month.`;
                     }
@@ -690,7 +720,8 @@
             selectedMonth = document.getElementById('month-filter').value;
             renderExpenses();
             
-            if (isMonthEnded(selectedMonth)) {
+            // For admin, changing month hides report until they click Calculate Settlement. For non-admin, auto show if ended.
+            if (isMonthEnded(selectedMonth) && !isAdmin) {
                 calculateSettlement();
             } else {
                 document.getElementById('report-card').style.display = 'none';
@@ -765,9 +796,9 @@
 
             renderExpenses();
             
-            if (isMonthEnded(selectedMonth)) {
+            if (isMonthEnded(selectedMonth) && !isAdmin) {
                 calculateSettlement();
-            } else {
+            } else if (!isAdmin) {
                 document.getElementById('report-card').style.display = 'none';
             }
 
@@ -869,7 +900,7 @@
 
             renderExpenses();
             await saveExpensesToCloud();
-            if (isMonthEnded(selectedMonth)) {
+            if (isMonthEnded(selectedMonth) && document.getElementById('report-card').style.display === 'block') {
                 calculateSettlement();
             }
         }
@@ -882,7 +913,9 @@
                 updateMonthDropdown();
                 renderExpenses();
                 await saveExpensesToCloud();
-                if (isMonthEnded(selectedMonth)) {
+                if (isMonthEnded(selectedMonth) && document.getElementById('report-card').style.display === 'block') {
+                    calculateSettlement();
+                } else if (!isAdmin && isMonthEnded(selectedMonth)) {
                     calculateSettlement();
                 } else {
                     document.getElementById('report-card').style.display = 'none';
@@ -912,11 +945,6 @@
         }
 
         function calculateSettlement() {
-            if (!isMonthEnded(selectedMonth)) {
-                document.getElementById('report-card').style.display = 'none';
-                return;
-            }
-
             const prevMonth = getPreviousMonthString(selectedMonth);
             let carryforwardDebts = {};
 
@@ -973,7 +1001,7 @@
             const [year, month] = selectedMonth.split('-');
             const monthLabel = new Date(year, month - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
 
-            document.getElementById('report-title').innerText = `Settlement Report (${monthLabel} - Archived Standing)`;
+            document.getElementById('report-title').innerText = `Settlement Report (${monthLabel} - Standing)`;
 
             let householdTotal = 0;
             let shawTotal = 0;
@@ -1089,7 +1117,11 @@
                     let creditor = tempCreditors[cIndex];
                     let transferAmount = Math.min(debtor.amount, creditor.amount);
 
-                    transferSteps.push(`<strong>${debtor.person}</strong> pays <strong>${creditor.person}</strong>: <span style="color:#27ae60; font-weight:bold;">$${transferAmount.toFixed(2)}</span>`);
+                    // If Viru & Drashti pay Jaimin & Ishani, show "Jaimin" as requested
+                    let creditorDisplayName = creditor.person;
+                    if (creditor.person === "Jaimin & Ishani") creditorDisplayName = "Jaimin";
+
+                    transferSteps.push(`<strong>${debtor.person}</strong> pays <strong>${creditorDisplayName}</strong>: <span style="color:#27ae60; font-weight:bold;">$${transferAmount.toFixed(2)}</span>`);
 
                     debtor.amount -= transferAmount;
                     creditor.amount -= transferAmount;
@@ -1204,6 +1236,7 @@
             });
 
             document.getElementById('report-card').style.display = 'block';
+            document.getElementById('report-card').scrollIntoView({ behavior: 'smooth' });
         }
 
         function exportToCSV() {
@@ -1266,11 +1299,7 @@
             await saveExpensesToCloud();
             updateMonthDropdown();
             renderExpenses();
-            if (isMonthEnded(selectedMonth)) {
-                calculateSettlement();
-            } else {
-                document.getElementById('report-card').style.display = 'none';
-            }
+            document.getElementById('report-card').style.display = 'none';
         }
     </script>
 </body>
