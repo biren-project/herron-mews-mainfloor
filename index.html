@@ -625,12 +625,15 @@
                 }
             }
 
+            // Custom profile profile naming for Drashti & Viru combined format as requested
+            const combinedProfileTitle = (userShareUnit === "Viru & Drashti") ? "Drashti & Viru" : userShareUnit;
+
             if (net >= 0) {
                 const remainingGet = net - paidAmount;
                 if (remainingGet <= 0.005) {
                     messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: You are fully settled up for last month! ✓`;
                 } else {
-                    messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: Your combined share gets back a net balance of <span class="gets-back">+$${remainingGet.toFixed(2)}</span>.`;
+                    messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: Your combined share (${combinedProfileTitle}) gets back a net balance of <span class="gets-back">+$${remainingGet.toFixed(2)}</span>.`;
                 }
             } else {
                 const totalOwed = Math.abs(net);
@@ -639,16 +642,14 @@
                     messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: Your previous month's balance is fully settled ✓.`;
                 } else {
                     let owesToName = specificOwesTo;
-                    if (userShareUnit === "Viru & Drashti" && specificOwesTo === "Jaimin & Ishani") {
-                        owesToName = "Jaimin"; 
+                    if (owesToName === "Jaimin & Ishani") {
+                        owesToName = "Jaimin & Ishani";
                     }
 
                     if (owesToName) {
-                        messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: Your combined share owes to ${owesToName}: <span class="owes">-$${remainingDebt.toFixed(2)}</span>.`;
-                    } else if (specificOwesTo) {
-                        messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: Your combined share owes to ${specificOwesTo}: <span class="owes">-$${remainingDebt.toFixed(2)}</span>.`;
+                        messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: Your combined share (${combinedProfileTitle}) has an outstanding balance / owes to ${owesToName}: <span class="owes">-$${remainingDebt.toFixed(2)}</span>.`;
                     } else {
-                        messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: Your combined share has an outstanding balance / owes <span class="owes">-$${remainingDebt.toFixed(2)}</span> from last month.`;
+                        messageHtml = `💰 <strong>Household Expenses (${prevMonthLabel})</strong>: Your combined share (${combinedProfileTitle}) has an outstanding balance / owes <span class="owes">-$${remainingDebt.toFixed(2)}</span> from last month.`;
                     }
                 }
             }
@@ -1039,10 +1040,11 @@
             upstairsShares.forEach(shareUnit => {
                 const hSpent = shareHouseholdSpent[shareUnit] || 0;
                 const uSpent = shareUtilitySpent[shareUnit] || 0;
+                const displayShareUnit = (shareUnit === "Viru & Drashti") ? "Drashti & Viru" : shareUnit;
 
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td><strong>${shareUnit}</strong></td>
+                    <td><strong>${displayShareUnit}</strong></td>
                     <td class="val-household">$${hSpent.toFixed(2)}</td>
                     <td class="val-utility">$${uSpent.toFixed(2)}</td>
                 `;
@@ -1093,10 +1095,10 @@
                     let creditor = tempCreditors[cIndex];
                     let transferAmount = Math.min(debtor.amount, creditor.amount);
 
-                    let creditorDisplayName = creditor.person;
-                    if (creditor.person === "Jaimin & Ishani") creditorDisplayName = "Jaimin";
+                    let debtorDisplayName = (debtor.person === "Viru & Drashti") ? "Drashti & Viru" : debtor.person;
+                    let creditorDisplayName = (creditor.person === "Jaimin & Ishani") ? "Jaimin & Ishani" : creditor.person;
 
-                    transferSteps.push(`<strong>${debtor.person}</strong> pays <strong>${creditorDisplayName}</strong>: <span style="color:#27ae60; font-weight:bold;">$${transferAmount.toFixed(2)}</span>`);
+                    transferSteps.push(`<strong>${debtorDisplayName}</strong> pays <strong>${creditorDisplayName}</strong>: <span style="color:#27ae60; font-weight:bold;">$${transferAmount.toFixed(2)}</span>`);
 
                     debtor.amount -= transferAmount;
                     creditor.amount -= transferAmount;
@@ -1198,9 +1200,11 @@
                     rowSubInfo += `<br><small style="color:#e67e22;">Paid so far: $${paidAmount.toFixed(2)}</small>`;
                 }
 
+                const displayShareUnit = (shareUnit === "Viru & Drashti") ? "Drashti & Viru" : shareUnit;
+
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td><strong>${shareUnit}</strong> ${rowSubInfo}</td>
+                    <td><strong>${displayShareUnit}</strong> ${rowSubInfo}</td>
                     <td class="val-paid">$${paid.toFixed(2)}</td>
                     <td class="val-target">$${totalTarget.toFixed(2)}</td>
                     <td class="${netClass}">${formattedNet}</td>
