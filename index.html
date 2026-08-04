@@ -270,7 +270,7 @@
             </div>
         </div>
 
-        <!-- Cumulative Settlement Report (Admin Only & Accessible for Archived Months) -->
+        <!-- Cumulative Settlement Report (Hidden for active current month until month end) -->
         <div class="card" id="report-card" style="display: none;">
             <h2 id="report-title">Settlement Report (Main Floor Household)</h2>
             
@@ -376,6 +376,12 @@
             return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         }
 
+        // Helper to check if a month has ended (i.e. is strictly prior to current live calendar month)
+        function isMonthEnded(monthStr) {
+            const currentYM = getLocalMonthString(new Date());
+            return monthStr < currentYM;
+        }
+
         let selectedMonth = getLocalMonthString();
 
         // Parse URL Parameters
@@ -452,8 +458,12 @@
                 updateMonthDropdown();
                 renderExpenses();
                 
-                // Automatically display settlement report for active or archived months
-                calculateSettlement();
+                // Only display settlement report if viewing an ended/archived month
+                if (isMonthEnded(selectedMonth)) {
+                    calculateSettlement();
+                } else {
+                    document.getElementById('report-card').style.display = 'none';
+                }
             } catch (err) {
                 console.error('Error fetching cloud data:', err);
                 
@@ -468,7 +478,11 @@
                     statusEl.innerText = 'Offline mode: Loaded cached local data. Retrying cloud...';
                     updateMonthDropdown();
                     renderExpenses();
-                    calculateSettlement();
+                    if (isMonthEnded(selectedMonth)) {
+                        calculateSettlement();
+                    } else {
+                        document.getElementById('report-card').style.display = 'none';
+                    }
                 } else {
                     statusEl.innerText = 'Sync failed. Retrying in 5 seconds...';
                 }
@@ -516,7 +530,13 @@
         function onMonthFilterChange() {
             selectedMonth = document.getElementById('month-filter').value;
             renderExpenses();
-            calculateSettlement();
+            
+            // Respect month-end rule: only calculate/display report if the month has ended
+            if (isMonthEnded(selectedMonth)) {
+                calculateSettlement();
+            } else {
+                document.getElementById('report-card').style.display = 'none';
+            }
         }
 
         // SAVE EXPENSES TO CLOUD
@@ -590,7 +610,12 @@
             updateMonthDropdown();
 
             renderExpenses();
-            calculateSettlement();
+            
+            if (isMonthEnded(selectedMonth)) {
+                calculateSettlement();
+            } else {
+                document.getElementById('report-card').style.display = 'none';
+            }
 
             await saveExpensesToCloud();
 
@@ -694,7 +719,9 @@
 
             renderExpenses();
             await saveExpensesToCloud();
-            calculateSettlement();
+            if (isMonthEnded(selectedMonth)) {
+                calculateSettlement();
+            }
         }
 
         // Admin Action: Delete Expense
@@ -706,7 +733,11 @@
                 updateMonthDropdown();
                 renderExpenses();
                 await saveExpensesToCloud();
-                calculateSettlement();
+                if (isMonthEnded(selectedMonth)) {
+                    calculateSettlement();
+                } else {
+                    document.getElementById('report-card').style.display = 'none';
+                }
             }
         }
 
@@ -736,6 +767,12 @@
 
         // Calculate Settlement & Spending Summary for Selected Month
         function calculateSettlement() {
+            // Guard: Do not calculate or display settlement report for active months
+            if (!isMonthEnded(selectedMonth)) {
+                document.getElementById('report-card').style.display = 'none';
+                return;
+            }
+
             const prevMonth = getPreviousMonthString(selectedMonth);
             let carryforwardDebts = {};
 
@@ -793,10 +830,7 @@
             const [year, month] = selectedMonth.split('-');
             const monthLabel = new Date(year, month - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
 
-            const currentYM = getLocalMonthString();
-            document.getElementById('report-title').innerText = selectedMonth === currentYM 
-                ? `Settlement Report (${monthLabel} - Active)` 
-                : `Settlement Report (${monthLabel} - Previous Month / Archived Standing)`;
+            document.getElementById('report-title').innerText = `Settlement Report (${monthLabel} - Archived Standing)`;
 
             let householdTotal = 0;
             let shawTotal = 0;
@@ -1097,7 +1131,11 @@
             await saveExpensesToCloud();
             updateMonthDropdown();
             renderExpenses();
-            calculateSettlement();
+            if (isMonthEnded(selectedMonth)) {
+                calculateSettlement();
+            } else {
+                document.getElementById('report-card').style.display = 'none';
+            }
         }
     </script>
 </body>
